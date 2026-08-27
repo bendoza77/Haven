@@ -252,6 +252,51 @@ catalogue.
 
 ---
 
+## Hosting the API on Render instead
+
+Render runs a long-lived process rather than importing a handler, so it needs
+something listening on a port. `app.js` binds one when it is run directly, and
+`server.js` does the same, so either entry point works — but set these anyway:
+
+| Setting | Value |
+| --- | --- |
+| Root Directory | `server` |
+| Build Command | `npm install` |
+| Start Command | `npm start` |
+
+**"Port scan timeout reached, no open ports detected"** means nothing bound a
+port. Almost always the Start Command is running a file that only exports the
+app, or the Root Directory is not `server` so `npm start` found no
+`package.json`. Render provides the port in `PORT`; the server reads it and
+listens on every interface, which is what makes it visible from outside the
+container.
+
+Environment variables are the same as the Vercel list, plus three that Vercel
+did not need:
+
+| Name | Value | Why |
+| --- | --- | --- |
+| `NODE_ENV` | `production` | without it the session cookie is not marked `Secure`, and a cross-site sign-in silently fails |
+| `TRUST_FORWARDED_FOR` | `true` | Vercel is detected automatically; Render is not, and without this every visitor shares one rate-limit bucket |
+| `TRUSTED_PROXY_HOPS` | `1` | Render appends the caller's address to `X-Forwarded-For`; this says how far in from the right to read it. Add one per extra proxy — Cloudflare in front, for example |
+
+Then add Render's outbound addresses under **Atlas → Network Access**. If you
+skip it, the API still starts and `/api/health` still answers — it reports the
+database as unreachable and every data route returns 503 with the reason, which
+is deliberate. A server that killed itself over this would just restart forever
+and tell you nothing.
+
+Finally, point `CLIENT_URL` at the storefront and `API_ORIGIN` (on the
+storefront) at the Render URL, and send Stripe's webhook to
+`https://<your-service>.onrender.com/api/orders/webhook`.
+
+> Free Render instances sleep when idle and take a few seconds to wake. The
+> first request after a nap can outlast Stripe's webhook timeout — Stripe
+> retries, so payments still land, but expect a delay before an order flips to
+> *Processing*.
+
+---
+
 ## Rate limiting
 
 Limits are enforced per visitor, with tighter budgets on the routes that either

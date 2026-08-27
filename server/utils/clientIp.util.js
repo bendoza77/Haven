@@ -58,13 +58,44 @@ const isInternalCall = (req) => fromTrustedProxy(req) && !req.get(CLIENT_IP_HEAD
 
 /* Whether a forwarding header may be believed on a request that did not come
    through our own proxy. True on Vercel, whose edge overwrites X-Forwarded-For
-   and refuses to pass an external one through, so its first entry is the real
-   caller. Anywhere else it is off unless the operator says their proxy does the
-   same. */
-const trustForwardedHeader =
-    Boolean(process.env.VERCEL) || process.env.TRUST_FORWARDED_FOR === "true";
+   and refuses to pass an external one through. Anywhere else it is off unless
+   the operator says their proxy is trustworthy too. */
+const onVercel = Boolean(process.env.VERCEL);
 
-const firstAddress = (value) => value?.split(",")[0]?.trim() || null;
+const trustForwardedHeader = onVercel || process.env.TRUST_FORWARDED_FOR === "true";
+
+/**
+ * How many proxies of our own sit in front of this process.
+ *
+ * This decides which entry of X-Forwarded-For is the caller, and getting it
+ * wrong is a silent rate-limit bypass rather than an error. Most proxies —
+ * Render, nginx, Cloudflare — *append* the address they saw, so the list reads
+ * "whatever the client sent, then the truth". Reading it left to right there
+ * hands the key straight back to the caller, who can put anything they like at
+ * the front. Counting from the right instead skips our own hops and lands on
+ * the last address a machine we trust actually observed.
+ *
+ * Vercel is the exception and needs none of this: it replaces the header
+ * outright, so there is only ever one entry and it is the real one.
+ */
+const proxyHops = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS ?? 1) || 1);
+
+const entries = (value) =>
+    (value ?? "").split(",").map((part) => part.trim()).filter(Boolean);
+
+const firstAddress = (value) => entries(value)[0] ?? null;
+
+/** The last address our own proxies did not add themselves. */
+const addressBehindProxies = (value) => {
+    const chain = entries(value);
+
+    if (!chain.length) return null;
+
+    /* One hop means the rightmost entry; two means the one before it, and so
+       on. Clamped, so a chain shorter than expected yields its leftmost entry
+       rather than undefined. */
+    return chain[Math.max(0, chain.length - proxyHops)] ?? chain[0];
+};
 
 /** The address to hold responsible for this request. */
 const clientIp = (req) => {
@@ -74,9 +105,12 @@ const clientIp = (req) => {
     }
 
     if (trustForwardedHeader) {
-        const edge =
-            firstAddress(req.get("x-vercel-forwarded-for")) ??
-            firstAddress(req.get("x-forwarded-for"));
+        /* Vercel's own header is written by its edge and is a single address. */
+        const edge = onVercel
+            ? firstAddress(req.get("x-vercel-forwarded-for")) ??
+              firstAddress(req.get("x-forwarded-for"))
+            : addressBehindProxies(req.get("x-forwarded-for")) ??
+              firstAddress(req.get("x-real-ip"));
 
         if (edge) return edge;
     }

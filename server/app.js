@@ -210,6 +210,27 @@ app.use((req, res, next) => {
 
 app.use(globalErrorHandler);
 
-/* Exported rather than listened on: Vercel imports this module and drives it
-   per request. `npm start` runs server.js, which is the one that binds a port. */
 module.exports = app;
+
+/**
+ * Bind a port, but only when this file is what was actually run.
+ *
+ * The two hosting models want opposite things and this is how one file serves
+ * both. Vercel *imports* this module and calls it per request — there is no
+ * long-running process, and an app that grabbed a port on import would be
+ * wrong there. Render, Railway, Fly and a plain container are the reverse:
+ * they start the process and wait for something to listen, and a module that
+ * only ever exported would look to them like a service that never came up.
+ * That is exactly the "no open ports detected" timeout.
+ *
+ * `require.main === module` is the difference between the two: true for
+ * `node app.js`, false when something else imported it. So the export above is
+ * what Vercel drives, this is what everything else starts, and neither host
+ * needs to be told which entry point to use.
+ *
+ * server.js remains the documented entry point and does the same thing; this
+ * is here so that pointing a host at the wrong one of the two still works.
+ */
+if (require.main === module) {
+    require("./server");
+}
