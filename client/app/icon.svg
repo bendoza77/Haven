@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Haven">
+  <!--
+    The tab mark: the wordmark's initial, cut as a serif H.
+
+    It carries its own dark ground rather than drawing a bare glyph, because a
+    favicon sits on whatever colour the browser chrome happens to be — a shape
+    that relied on the page background would vanish in half of them.
+
+    Drawn as rects rather than text: a favicon has no webfonts, so real type
+    would fall back to whatever the machine has and stop being the brand.
+  -->
+  <rect width="64" height="64" rx="14" fill="#191512"/>
+  <g fill="#f4efe9">
+    <!-- stems -->
+    <rect x="20.4" y="16" width="6.4" height="32"/>
+    <rect x="37.2" y="16" width="6.4" height="32"/>
+    <!-- crossbar, set slightly above centre the way a serif H is -->
+    <rect x="20.4" y="29.4" width="23.2" height="5.6"/>
+    <!-- slab serifs, extending outward from each stem -->
+    <rect x="16.6" y="16" width="14" height="3.1"/>
+    <rect x="33.4" y="16" width="14" height="3.1"/>
+    <rect x="16.6" y="44.9" width="14" height="3.1"/>
+    <rect x="33.4" y="44.9" width="14" height="3.1"/>
+  </g>
+</svg>

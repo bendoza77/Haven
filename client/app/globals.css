@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+/* Dark mode is driven by data-theme on <html>, set before first paint by the
+   inline script in the root layout. No media query here: the toggle has to be
+   able to override the system preference in both directions. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Georgian sets appreciably wider than Latin at the same size, and its words
+   do not break. A `ka:` variant lets the few oversized display headings step
+   down a size in Georgian only, in the markup, next to the size they override
+   — rather than being re-specified in a stylesheet far from the component. */
+@custom-variant ka (&:where(:lang(ka), :lang(ka) *));
+
+/* ---------------------------------------------------------------
+   Design tokens. Every colour, radius and shadow used in the app
+   is defined here so components never invent their own values.
+   --------------------------------------------------------------- */
+@theme {
+  /* The Georgian faces sit after the Latin ones: a browser walks a font
+     stack per character, so Latin text keeps Geist while Georgian picks up
+     Noto instead of an arbitrary system fallback. One stack, both languages. */
+  --font-sans: var(--font-geist-sans), var(--font-georgian-sans), ui-sans-serif, system-ui,
+    sans-serif;
+  --font-display: var(--font-instrument-serif), var(--font-georgian-serif), Georgia,
+    "Times New Roman", serif;
+
+  /* Surfaces */
+  --color-canvas: #ffffff;
+  --color-surface: #f7f4ef;
+  --color-surface-strong: #ede7dd;
+
+  /* Text */
+  --color-ink: #191512;
+  --color-ink-muted: #5c544b;
+  --color-ink-subtle: #8a8177;
+
+  /* Lines */
+  --color-line: #e4ded4;
+  --color-line-strong: #d3cabc;
+
+  /* Editorial panels that stay dark in both themes: the announcement bar,
+     the promo banner, the auth panel and the scrims over photography. */
+  --color-feature: #191512;
+  --color-feature-ink: #ffffff;
+
+  /* Accent + status */
+  --color-accent: #9d4b24;
+  --color-accent-soft: #f6eae1;
+  --color-success: #2e6b4f;
+  --color-warning: #92651a;
+  --color-danger: #a02f26;
+
+  /* Radii — three steps only */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.875rem;
+
+  --shadow-card: 0 1px 2px rgb(25 21 18 / 0.04), 0 12px 32px -20px rgb(25 21 18 / 0.25);
+  --shadow-pop: 0 8px 40px -12px rgb(25 21 18 / 0.22);
+}
+
+@layer base {
+  /* Every value below is the same token under a different light. Components
+     never branch on the theme — they read the token and stay as written. */
+  :root {
+    color-scheme: light;
+  }
+
+  [data-theme="dark"] {
+    color-scheme: dark;
+
+    --color-canvas: #141110;
+    --color-surface: #1c1917;
+    --color-surface-strong: #272220;
+
+    --color-ink: #f4efe9;
+    --color-ink-muted: #b5aa9e;
+    --color-ink-subtle: #8d8377;
+
+    --color-line: #2f2926;
+    --color-line-strong: #423a35;
+
+    --color-feature: #221e1b;
+    --color-feature-ink: #f4efe9;
+
+    /* Lifted off the light-mode values so they carry on a dark ground. */
+    --color-accent: #d9773f;
+    --color-accent-soft: #2a1c14;
+    --color-success: #5faa83;
+    --color-warning: #d1a34a;
+    --color-danger: #e0685c;
+
+    /* Shadows read as shape, not haze, once the ground is dark. */
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px -20px rgb(0 0 0 / 0.9);
+    --shadow-pop: 0 8px 40px -12px rgb(0 0 0 / 0.7);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* One consistent focus treatment across the whole app. */
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background-color: var(--color-ink);
+    color: var(--color-canvas);
+  }
+}
+
+/* ---------------------------------------------------------------
+   Georgian (მხედრული) typography. The script is unicameral and its
+   letters carry ascenders and descenders that Latin small-caps
+   treatments were never drawn for, so the display conventions used
+   across the app are relaxed for :lang(ka) rather than deleted from
+   the components — English keeps every one of them.
+   --------------------------------------------------------------- */
+:lang(ka) {
+  /* There is no upper case to transform to. Left in place the rule is a
+     no-op on Georgian, but it still hits any Latin sharing the label
+     (a brand name, a size code), which then reads as shouting. */
+  text-transform: none;
+  /* Tracking drawn for 11px Latin caps pulls Georgian letters apart far
+     enough that words stop holding together as shapes. */
+  letter-spacing: normal;
+}
+
+:lang(ka) :where(h1, h2, h3, h4, p, a, li, dd, dt) {
+  /* Georgian compounds are long and have no hyphenation in browsers; without
+     this a single word can run past its column instead of wrapping. */
+  overflow-wrap: break-word;
+}
+
+:lang(ka) :where(h1, h2, h3, h4) {
+  /* tracking-tight collides the ascenders in ბ, დ and ღ. */
+  letter-spacing: normal;
+  /* Georgian sits taller than Latin at the same size; display leading
+     tuned for Instrument Serif clips descenders here. */
+  line-height: 1.25;
+}
+
+:lang(ka) :where(button, a, label, dt, th, summary) {
+  letter-spacing: normal;
+}
+
+@layer utilities {
+  /* Horizontal card rails on mobile. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
