@@ -24,7 +24,8 @@ const AppError = require("../utils/AppError.util");
    have to be done on purpose. */
 const DISABLED = process.env.RATE_LIMIT_DISABLED === "true";
 
-const MINUTE = 60 * 1000;
+const SECOND = 1000;
+const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 
 /**
@@ -124,16 +125,25 @@ const authLimiter = limiter({
 /**
  * Anything that puts a message in somebody's inbox.
  *
- * The tightest budget in the file, because these are the only routes where an
- * anonymous caller can spend real money and use this shop to harass a stranger.
- * Five an hour is far above what a person who has genuinely lost a password
- * needs.
+ * A short cooling-off period rather than a real budget, set deliberately: an
+ * hour's lockout punished the ordinary case — a code that never arrived, an
+ * address typed wrong the first time — far more often than it stopped anybody.
+ * Ten seconds is long enough that a script cannot hold the send button down,
+ * and short enough that a person who genuinely needs another email is not sent
+ * away to wait.
+ *
+ * Be clear about what this no longer does. At five per ten seconds a
+ * determined caller can request on the order of a thousand emails an hour, so
+ * this is no longer meaningful protection against burying a stranger's inbox
+ * or running up the mail bill — it is a throttle, not a cap. If that matters
+ * later, the fix is to keep this window and add a second, wider one over an
+ * hour, so a burst is smoothed AND a day of it is still bounded.
  */
 const emailLimiter = limiter({
-    windowMs: HOUR,
+    windowMs: 10 * SECOND,
     max: 5,
     prefix: "email",
-    message: "Too many emails requested. Please wait an hour before asking for another."
+    message: "Too many emails requested. Please wait a few seconds before asking for another."
 });
 
 /**
@@ -148,12 +158,12 @@ const emailLimiter = limiter({
  * malformed flood exhaust the budget for everybody.
  */
 const emailTargetLimiter = limiter({
-    windowMs: HOUR,
+    windowMs: 10 * SECOND,
     max: 4,
     prefix: "email-to",
     keyGenerator: (req) => String(req.body?.email ?? "").trim().toLowerCase(),
     skip: (req) => !req.body?.email,
-    message: "Too many emails requested for that address. Please wait an hour."
+    message: "Too many emails requested for that address. Please wait a few seconds."
 });
 
 /** Redeeming a reset or confirmation link. The tokens are random and hashed,

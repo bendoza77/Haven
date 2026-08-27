@@ -306,10 +306,23 @@ guess secrets or spend money:
 | --- | --- | --- |
 | everything under `/api` | 1000 / 15 min | blanket ceiling |
 | `POST /auth/login`, `/auth/verify-2fa` | 10 failures / 15 min | credential and code guessing; successes are refunded |
-| `/auth/signup`, `/forgot-password`, `/resend-verification`, `/resend-2fa` | 5 / hour per visitor **and** 4 / hour per target address | these send real email — the second key is what stops many sources burying one inbox |
+| `/auth/signup`, `/forgot-password`, `/resend-verification`, `/resend-2fa` | 5 / 10 s per visitor **and** 4 / 10 s per target address | a cooling-off period between sends, not a cap — see the note below |
 | `/auth/verify-email/:token`, `/auth/reset-password/:token` | 20 / hour | backstop against grinding a link |
 | review writes, `/orders/checkout` | 40 / 15 min | spam, and Stripe sessions cost money |
 | `POST /products/upload` | 60 / hour **per staff account** | each upload writes megabytes into MongoDB |
+
+The email windows are deliberately short. An hour's lockout punished the
+ordinary case — a code that never arrived, an address mistyped once — far more
+often than it stopped anyone. The trade is real and worth stating: at five per
+ten seconds, a determined caller can request roughly a thousand emails an hour,
+so these throttle bursts rather than cap volume, and they are no longer
+meaningful protection against burying a stranger's inbox or running up the
+Resend bill. If that becomes a problem, keep the ten-second window and add a
+second wider one over an hour — bursts stay smoothed and the day stays bounded.
+
+Guessing a two-step code is *not* what these protect. That is capped by the
+sign-in limiter on `/auth/verify-2fa` — ten failures per fifteen minutes,
+however many fresh codes get issued — which is unaffected by the change above.
 
 Two things make this work rather than merely exist, and both need the
 `INTERNAL_PROXY_SECRET` above to be set identically on both projects:

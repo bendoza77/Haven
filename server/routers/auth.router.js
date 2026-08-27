@@ -33,9 +33,14 @@ authRouter.post("/login", authLimiter, login);
    is no session yet, which is the whole point of the step. */
 authRouter.post("/verify-2fa", authLimiter, verifyTwoFactor);
 
-/* The account layer burns a code after five wrong guesses, but a fresh code
-   resets that count — so without a limit here, a six-digit code could be ground
-   down by alternating guesses and resends. This is what closes that. */
+/* The account layer burns a code after five wrong guesses, but asking for a
+   fresh one resets that count — so resends are what would let a six-digit code
+   be ground down, by alternating guesses with new codes.
+
+   What stops that is authLimiter on verify-2fa above, which caps *guesses* at
+   ten per fifteen minutes however many codes get issued. That is the binding
+   constraint, and it holds regardless of how loose the resend budget is. The
+   limiters here are about the cost and nuisance of the emails themselves. */
 authRouter.post("/resend-2fa", emailLimiter, emailTargetLimiter, resendTwoFactor);
 
 /* Both links arrive from an inbox, so they are reachable without a session —
