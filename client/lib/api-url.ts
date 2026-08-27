@@ -41,3 +41,25 @@ export function apiBase() {
 
   return `${serverOrigin()}${configured}`;
 }
+
+/**
+ * Marks a request as the storefront's own, rather than one it is relaying.
+ *
+ * Server-rendered pages fetch the catalogue directly, so every one of those
+ * calls arrives at the API from this deployment's single address. Counted as a
+ * visitor, the shop would rate-limit itself the moment it got busy. The secret
+ * says "this is the storefront asking, on behalf of nobody in particular", and
+ * the API exempts it from the per-visitor budget — it is already behind the
+ * limits the storefront applies to the people it serves.
+ *
+ * Empty in the browser, and deliberately so. INTERNAL_PROXY_SECRET has no
+ * NEXT_PUBLIC_ prefix, so Next never inlines it into a client bundle; the guard
+ * makes sure a stray import from a client component cannot reach for it either.
+ */
+export function internalHeaders(): Record<string, string> {
+  if (typeof window !== "undefined") return {};
+
+  const secret = process.env.INTERNAL_PROXY_SECRET;
+
+  return secret ? { "x-haven-proxy-secret": secret } : {};
+}

@@ -115,7 +115,27 @@ export type OrderItem = {
   color?: string;
 };
 
-export type OrderStatus = "Processing" | "In transit" | "Delivered" | "Cancelled";
+/**
+ * Where the parcel is. Distinct from where the money is — an order sits at
+ * "Awaiting payment" between opening a Stripe session and Stripe confirming it,
+ * which is a real state a shopper can refresh into and needs to be told about.
+ */
+export type OrderStatus =
+  | "Awaiting payment"
+  | "Processing"
+  | "In transit"
+  | "Delivered"
+  | "Cancelled"
+  | "Payment failed";
+
+/** What Stripe knows about an order. Absent on orders placed before checkout. */
+export type OrderPayment = {
+  status: "pending" | "succeeded" | "failed" | "canceled";
+  currency?: string;
+  /** Minor units, as Stripe reports it. */
+  amountTotal?: number;
+  paidAt?: string;
+};
 
 export type Order = {
   _id: string;
@@ -129,6 +149,7 @@ export type Order = {
   tax: number;
   total: number;
   status: OrderStatus;
+  payment?: OrderPayment;
   /** Total pieces, not lines — a virtual the API sends down. */
   itemCount: number;
   createdAt?: string;
@@ -412,15 +433,29 @@ export const api = {
       return request<ApiResponse<Order>>(`/orders/me/${id}`);
     },
 
-    /** Places the bag as an order. Prices come from the catalogue, not from here. */
-    create(payload: {
+    /**
+     * Starts a payment for whatever is in the bag.
+     *
+     * Note what is NOT sent: no prices, no quantities, no product ids. The
+     * server reads all of that from the account's own cart and from the
+     * catalogue, because a checkout that believed the browser about what things
+     * cost would be a shop anybody could buy from for a penny. An address and a
+     * delivery choice are the only things the shopper actually decides.
+     *
+     * Answers with a Stripe-hosted URL to send the browser to. The order exists
+     * from this moment, unpaid, and becomes real when Stripe says so.
+     */
+    checkout(payload: {
       shipping: Omit<Address, "_id" | "label" | "isDefault">;
       deliveryMethod?: Order["deliveryMethod"];
     }) {
-      return request<ApiResponse<Order>>("/orders", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      return request<ApiResponse<{ order: Order; sessionId: string; sessionUrl: string }>>(
+        "/orders/checkout",
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        },
+      );
     },
 
     /** Console only — admin and moderator. */

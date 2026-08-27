@@ -21,7 +21,15 @@ const cache = globalThis.__havenMongo ?? (globalThis.__havenMongo = {
 /* Some local networks cannot resolve the Atlas SRV record through their own
    resolver, and pinning a public one fixes it. On Vercel the platform resolver
    is the correct one and overriding it breaks the lookup, so this is skipped
-   there. Set DNS_SERVERS to override, or to an empty string to opt out. */
+   there. Set DNS_SERVERS to override, or to an empty string to opt out.
+
+   The `node:` prefix is not decoration. There is a package on npm called "dns"
+   — an unrelated DNS server daemon — and this project once had it in its
+   dependencies, presumably installed to satisfy this very line. It never did:
+   a bare "dns" always resolves to Node's built-in module, which cannot be
+   shadowed from node_modules. All the package ever contributed was a
+   dependency tree of its own carrying 38 advisories. Spelling the import
+   `node:dns` says out loud that nothing needs installing here. */
 if (!process.env.VERCEL) {
     const servers = (process.env.DNS_SERVERS ?? "8.8.8.8,8.8.4.4")
         .split(",")
@@ -29,7 +37,7 @@ if (!process.env.VERCEL) {
         .filter(Boolean);
 
     if (servers.length) {
-        require("dns").setServers(servers);
+        require("node:dns").setServers(servers);
     }
 }
 

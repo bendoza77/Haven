@@ -11,11 +11,6 @@ const mongoose = require("mongoose");
  */
 const orderItemSchema = new mongoose.Schema({
 
-    userId: {
-        type: mongoose.Types.ObjectId,
-        ref: "User",
-    },
-
     product: {
         type: mongoose.Types.ObjectId,
         ref: "Product"
@@ -45,16 +40,47 @@ const orderItemSchema = new mongoose.Schema({
     },
 
     size: { type: String, trim: true },
-    color: { type: String, trim: true },
+    color: { type: String, trim: true }
 
-    stripeSessionId: {type: String, required: [true, "Stripe session if is required"]},
-    stripePaymentIntentId: {type: String, required: [true, "Stripe payment intend is required"]},
-    stripeCostumerId: {type: String, required: [true, "Stripe costumer is required"]},
-    stripePaymentStatus: {type: String, enum: ["pending", "succeeded", "failed", "canceled"], default: "pending"},
-    amount: {type: Number, default: "USD"},
-    stripeWebhookProccesd: {type: Boolean, default: false}
+}, { _id: false });
 
+/**
+ * What Stripe knows about this order.
+ *
+ * On the order, not on each line: one checkout is one payment, and hanging a
+ * session id off every item would ask the same question of the database as
+ * many times as there are things in the bag — and leave open what it would
+ * mean for two lines of one order to disagree.
+ *
+ * `status` here is about the money and is Stripe's word for it. The order's own
+ * `status` is about the parcel. They are genuinely different facts: a paid
+ * order can still be cancelled, and an order can sit unpaid for an hour while
+ * somebody hunts for their card.
+ */
+const paymentSchema = new mongoose.Schema({
+    sessionId: { type: String, index: true },
+    paymentIntentId: { type: String },
+    customerId: { type: String },
 
+    status: {
+        type: String,
+        enum: ["pending", "succeeded", "failed", "canceled"],
+        default: "pending"
+    },
+
+    currency: { type: String, default: "usd", lowercase: true },
+
+    /* In minor units, as Stripe reports it — cents, not dollars. Kept as Stripe
+       sent it so the two records can be compared without rounding. */
+    amountTotal: { type: Number, min: 0 },
+
+    /* Set once the webhook has acted on this order. Stripe delivers an event at
+       least once, not exactly once, so the handler checks this before doing
+       anything that must not happen twice — taking stock down, emptying a bag,
+       sending a receipt. */
+    webhookProcessed: { type: Boolean, default: false },
+
+    paidAt: { type: Date }
 }, { _id: false });
 
 /* The address is copied too, for the same reason: where it went is part of
@@ -71,7 +97,17 @@ const shippingSchema = new mongoose.Schema({
     phone: { type: String, trim: true }
 }, { _id: false });
 
-const STATUSES = ["Processing", "In transit", "Delivered", "Cancelled"];
+/* "Awaiting payment" is where an order starts now: it exists, it is reserved,
+   and nothing has been charged. It becomes "Processing" when Stripe says the
+   money arrived, and "Payment failed" when Stripe says it did not. */
+const STATUSES = [
+    "Awaiting payment",
+    "Processing",
+    "In transit",
+    "Delivered",
+    "Cancelled",
+    "Payment failed"
+];
 
 const orderSchema = new mongoose.Schema({
     /* Human-facing, and what the shopper quotes when they write in. Generated
@@ -120,7 +156,12 @@ const orderSchema = new mongoose.Schema({
             values: STATUSES,
             message: "{VALUE} is not a status an order can be in"
         },
-        default: "Processing"
+        default: "Awaiting payment"
+    },
+
+    payment: {
+        type: paymentSchema,
+        default: () => ({})
     }
 }, { timestamps: true });
 

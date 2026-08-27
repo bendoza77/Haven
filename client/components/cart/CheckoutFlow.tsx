@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Loader2, Lock } from "lucide-react";
+import { AlertCircle, ArrowRight, CreditCard, Loader2, Lock, ShieldCheck } from "lucide-react";
 import CheckoutSummary from "@/components/cart/CheckoutSummary";
 import { Input, Select } from "@/components/ui/Field";
 import { useAuth } from "@/context/AuthContext";
@@ -17,12 +16,6 @@ const deliveryOptions = [
   { id: "standard", key: "standard", price: undefined },
   { id: "express", key: "express", price: 25 },
   { id: "white-glove", key: "whiteGlove", price: 120 },
-] as const;
-
-const paymentOptions = [
-  { id: "card", key: "card" },
-  { id: "paypal", key: "paypal" },
-  { id: "wallet", key: "wallet" },
 ] as const;
 
 /* Values stored on the order; the visible name is translated against
@@ -107,19 +100,22 @@ const FORM_ID = "checkout-form";
  * are joined by the `form` attribute on that button rather than by lifting
  * the whole thing into a context for one submit.
  *
- * No money moves: there is no payment provider behind the card fields, and the
- * page says so. Everything else is real — the order is written, stock comes
- * down, the bag is emptied and a confirmation is emailed.
+ * The card details are collected by Stripe, not here. This form gathers an
+ * address and a delivery choice, asks the API to open a Checkout session, and
+ * hands the browser over — so no card number ever touches this application, and
+ * there is nothing on this page for anybody to steal one from.
+ *
+ * Nothing is charged and nothing is decided by this component. The prices, the
+ * totals and the order itself are the server's work; the shopper is only
+ * choosing where the parcel goes.
  */
 export default function CheckoutFlow() {
   const t = useTranslations("checkout");
   const money = useMoney();
-  const router = useRouter();
-  const { user, refresh } = useAuth();
+  const { user } = useAuth();
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [placed, setPlaced] = useState<Order | null>(null);
 
   /* Prefilled from the account's default address, so somebody who has ordered
      before does not retype what we already hold. */
@@ -174,51 +170,18 @@ export default function CheckoutFlow() {
         }
       }
 
-      const response = await api.orders.create({ shipping, deliveryMethod });
+      const response = await api.orders.checkout({ shipping, deliveryMethod });
 
-      /* The bag was emptied server-side; pull the account down so the header
-         count and the summary agree with it. */
-      await refresh();
-
-      setPlaced(response.data);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      /* Leaving the site, so `busy` deliberately stays true: the button must
+         not spring back to "Pay" while the browser is still navigating, or
+         somebody will press it again and open a second session. */
+      window.location.assign(response.data.sessionUrl);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : t("couldNotPlace"));
       window.scrollTo({ top: 0, behavior: "smooth" });
-    } finally {
       setBusy(false);
     }
   };
-
-  if (placed) {
-    return (
-      <div className="mx-auto max-w-lg rounded-lg border border-line bg-surface p-8 text-center">
-        <h2 className="font-display text-3xl leading-tight tracking-tight text-ink">
-          {t("thankYou", { reference: placed.reference })}
-        </h2>
-        <p className="mt-3 text-sm leading-relaxed text-ink-muted">
-          {t("confirmationSent")} <span className="text-ink">{user?.email}</span>.
-        </p>
-
-        <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:justify-center">
-          <button
-            type="button"
-            onClick={() => router.push("/account?tab=orders")}
-            className="flex h-11 items-center justify-center rounded-md bg-ink px-6 text-sm font-medium text-canvas transition-colors hover:bg-ink/90"
-          >
-            {t("viewOrders")}
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/shop")}
-            className="flex h-11 items-center justify-center rounded-md border border-line-strong bg-canvas px-6 text-sm font-medium text-ink transition-colors hover:border-ink"
-          >
-            {t("keepShopping")}
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-16">
@@ -322,33 +285,46 @@ export default function CheckoutFlow() {
           </Fieldset>
 
           <Fieldset step={4} title={t("steps.payment")}>
-            <div className="space-y-3">
-              {paymentOptions.map((option, index) => (
-                <RadioCard
-                  key={option.id}
-                  name="payment"
-                  id={`payment-${option.id}`}
-                  value={option.id}
-                  title={t(`payment.${option.key}Title`)}
-                  description={t(`payment.${option.key}Body`)}
-                  defaultChecked={index === 0}
-                />
-              ))}
+            {/* Not a form control: there is nothing to choose here and nothing
+                to type. It says where the card details will be asked for, and
+                by whom, because "next" is otherwise a leap of faith at exactly
+                the moment a shopper is deciding whether to trust the site. */}
+            <div className="rounded-lg border border-line-strong bg-surface p-5 sm:p-6">
+              <div className="flex items-start gap-3.5">
+                <span
+                  aria-hidden
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-ink text-canvas"
+                >
+                  <CreditCard className="size-[1.125rem]" strokeWidth={1.75} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-medium text-ink">{t("stripe.title")}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-ink-muted">
+                    {t("stripe.body")}
+                  </p>
+                </div>
+              </div>
+
+              <ul className="mt-5 grid gap-2.5 border-t border-line pt-5">
+                {(["secure", "cards", "cancel"] as const).map((point) => (
+                  <li key={point} className="flex items-start gap-2.5 text-sm text-ink-muted">
+                    <ShieldCheck
+                      className="mt-0.5 size-4 shrink-0 text-ink"
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
+                    {t(`stripe.${point}`)}
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            <div className="mt-6 grid gap-5 rounded-md border border-line bg-surface p-5 sm:grid-cols-2">
-              <Input id="card-number" label={t("cardNumber")} inputMode="numeric" autoComplete="off" placeholder={t("cardNumberPlaceholder")} disabled={busy} className="sm:col-span-2" />
-              <Input id="card-expiry" label={t("cardExpiry")} autoComplete="off" placeholder={t("cardExpiryPlaceholder")} disabled={busy} />
-              <Input id="card-cvc" label={t("cardCvc")} autoComplete="off" placeholder={t("cardCvcPlaceholder")} disabled={busy} />
-            </div>
-
-            {/* Said plainly rather than implied: the order is real, the payment
-                is not, and nobody should type a live card number in here. */}
             <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-ink-subtle">
               <Lock className="mt-px size-3.5 shrink-0" aria-hidden />
-              {t("paymentNotice")}
+              {t("stripe.notice")}
             </p>
           </Fieldset>
+
         </form>
       </div>
 
@@ -360,10 +336,13 @@ export default function CheckoutFlow() {
             busy ? (
               <>
                 <Loader2 className="size-4 animate-spin" strokeWidth={1.75} aria-hidden />
-                {t("placing")}
+                {t("redirecting")}
               </>
             ) : (
-              t("placeOrder")
+              <>
+                {t("payWithCard")}
+                <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
+              </>
             )
           }
         />

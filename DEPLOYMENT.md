@@ -52,9 +52,11 @@ Add these under **Settings → Environment Variables**, for *Production*,
 | `JWT_EXPIRES` | `3d` |
 | `CLIENT_URL` | the storefront's URL — you do not have it yet, put `https://haven.vercel.app` and correct it in step 3 |
 | `ALLOW_VERCEL_PREVIEWS` | `true` |
+| `INTERNAL_PROXY_SECRET` | a long random string — **the same value on both projects** |
 | `RESEND_API_KEY` | your Resend key |
 | `EMAIL_FROM` | `Haven <onboarding@resend.dev>` |
-| `STRIPE_SECRET_KEY` | your Stripe key |
+| `STRIPE_SECRET_KEY` | your Stripe secret key (`sk_test_…` or `sk_live_…`) |
+| `STRIPE_WEBHOOK_SECRET` | the signing secret from step 7 |
 | `GOOGLE_CLIENT_ID` | from Google Cloud Console |
 | `GOOGLE_CLIENT_SECRET` | from Google Cloud Console |
 | `GOOGLE_CALLBACK_URL` | `https://<storefront-domain>/api/auth/google/callback` — the **storefront** domain, see step 4 |
@@ -89,6 +91,7 @@ refusing the connection — see step 5.
 | --- | --- |
 | `NEXT_PUBLIC_API_URL` | `/api` |
 | `API_ORIGIN` | `https://haven-api.vercel.app` — the API project's URL, **no trailing slash** |
+| `INTERNAL_PROXY_SECRET` | the **same** value you set on `haven-api` |
 
 `API_ORIGIN` is read while the build runs, so changing it later means
 redeploying, not just restarting.
@@ -163,6 +166,68 @@ offers a link to the console that account does own.
 
 ---
 
+## 7. Stripe payments
+
+Card details are entered on Stripe's own hosted page, never on the storefront —
+no card number reaches this application at any point.
+
+**Point the webhook at the API directly**, not at the storefront:
+
+```
+https://haven-api.vercel.app/api/orders/webhook
+```
+
+Stripe signs the exact bytes it sends, and verification fails if anything
+rewrites them on the way. The storefront proxy has no reason to be in that path,
+so it is left out of it.
+
+In **Stripe Dashboard → Developers → Webhooks → Add endpoint**, use that URL and
+subscribe to:
+
+| Event | What it does here |
+| --- | --- |
+| `checkout.session.completed` | the one that matters — marks the order paid, takes stock down, empties the bag, emails the receipt |
+| `checkout.session.async_payment_succeeded` | the same, for methods that settle later |
+| `checkout.session.async_payment_failed` | marks the order "Payment failed" |
+| `checkout.session.expired` | shopper walked away — marks it "Cancelled" |
+| `payment_intent.payment_failed` | card refused |
+
+Copy the endpoint's signing secret into `STRIPE_WEBHOOK_SECRET` on **haven-api**
+and redeploy. Until that is set, checkout still sends people to Stripe and still
+takes their money — but nothing ever comes back to mark the order paid. It is
+the single most important value in this section.
+
+### How the flow runs
+
+1. The shopper fills in an address and presses **Continue to payment**.
+2. The API reads their bag and the catalogue, works out the totals **itself**,
+   writes an order as `Awaiting payment`, and opens a Stripe session. Nothing
+   about price, quantity or product comes from the browser — a checkout that
+   trusted the browser about what things cost would be a shop anybody could buy
+   from for a penny.
+3. Stripe collects the card and calls the webhook.
+4. On success the shopper lands on `/account?tab=orders`, where a banner
+   confirms the reference. On cancel they land on `/checkout/failed`, which says
+   plainly that nothing was charged and leaves the bag untouched.
+
+Stock is decremented and the bag emptied **only** in the webhook, so a shopper
+who abandons Stripe loses nothing. The webhook is idempotent — Stripe delivers
+at least once, not exactly once, and a replayed event will not take stock twice.
+
+### Testing it
+
+Use Stripe test mode and card `4242 4242 4242 4242`, any future expiry, any CVC.
+To exercise the webhook locally:
+
+```bash
+stripe listen --forward-to localhost:3001/api/orders/webhook
+```
+
+That prints a `whsec_…` secret — put it in `server/.env` as
+`STRIPE_WEBHOOK_SECRET` while you test.
+
+---
+
 ## Uploaded photography
 
 Product images are stored **in MongoDB** and served from `/api/media/<id>`.
@@ -184,6 +249,52 @@ Products seeded before this change may still hold `http://localhost:3001/...`
 URLs, which will not resolve in production. Re-upload those images from the
 admin console, or re-run `npm run seed` locally to reset them to the designed
 catalogue.
+
+---
+
+## Rate limiting
+
+Limits are enforced per visitor, with tighter budgets on the routes that either
+guess secrets or spend money:
+
+| Route | Budget | Why |
+| --- | --- | --- |
+| everything under `/api` | 1000 / 15 min | blanket ceiling |
+| `POST /auth/login`, `/auth/verify-2fa` | 10 failures / 15 min | credential and code guessing; successes are refunded |
+| `/auth/signup`, `/forgot-password`, `/resend-verification`, `/resend-2fa` | 5 / hour per visitor **and** 4 / hour per target address | these send real email — the second key is what stops many sources burying one inbox |
+| `/auth/verify-email/:token`, `/auth/reset-password/:token` | 20 / hour | backstop against grinding a link |
+| review writes, `/orders/checkout` | 40 / 15 min | spam, and Stripe sessions cost money |
+| `POST /products/upload` | 60 / hour **per staff account** | each upload writes megabytes into MongoDB |
+
+Two things make this work rather than merely exist, and both need the
+`INTERNAL_PROXY_SECRET` above to be set identically on both projects:
+
+**The counters are shared.** They live in MongoDB, not in process memory. A
+per-instance counter is meaningless on Vercel, because the platform answers a
+flood by starting more instances — the very thing being counted is the thing
+that resets the count.
+
+**The right person is counted.** Browser traffic reaches the API through the
+storefront's `/api` proxy, so the connection Express sees belongs to the
+storefront, not the shopper. Left alone, that means every visitor on earth
+shares one bucket and the limiter throttles the shop instead of the abuser. So
+`client/proxy.ts` strips any inbound forwarding headers, reads the visitor's
+address from the header Vercel's edge writes (which it refuses to let a caller
+supply), and passes it on under the shared secret. The API believes that header
+only when the secret checks out — otherwise it falls back to the connection
+address and ignores `X-Forwarded-For` entirely, since anyone can write that one
+and a fresh value per request would be a fresh budget per request.
+
+If `INTERNAL_PROXY_SECRET` is missing the API still works and still limits — it
+just cannot tell your visitors apart, so the limits apply to the storefront as
+a whole. Set it.
+
+Server-rendered page fetches carry the secret with no visitor attached, which
+marks them as the storefront's own traffic and exempts them; otherwise the shop
+would spend its own budget rendering pages.
+
+`RATE_LIMIT_DISABLED=true` turns every limiter into a pass-through. It is for
+local work only.
 
 ---
 
@@ -215,6 +326,9 @@ session works without it.
 | Moderator console | `/moderator-console` as a moderator | the dashboard |
 | Wrong console | `/admin-console` as a moderator | "Wrong console", with a link to theirs |
 | Uploads | add a product, choose an image | the thumbnail appears, and survives a redeploy |
+| Rate limiting | 11 wrong sign-ins in a row | a 429 with `Retry-After`, and other people unaffected |
+| Payment | buy something with card `4242 4242 4242 4242` | lands on `/account?tab=orders`, order reads *Processing*, stock down by one |
+| Cancelled payment | press back on Stripe's page | lands on `/checkout/failed`, bag still full, nothing charged |
 
 An empty shop with everything else working almost always means `API_ORIGIN` was
 missing when the storefront was built. Set it and redeploy.

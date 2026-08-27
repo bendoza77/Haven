@@ -5,6 +5,7 @@ const {
     deleteReviewById
 } = require("../controllers/review.controller");
 const protect = require("../middlewares/protect.middleware");
+const { writeLimiter } = require("../middlewares/rateLimit.middleware");
 const allowed = require("../utils/allowed.util");
 
 const reviewRouter = express.Router();
@@ -21,7 +22,7 @@ reviewRouter.get("/", allowed("admin", "moderator"), getReviews);
 /* No `allowed` here on purpose — a shopper may change their own review and an
    admin may change anybody's, and only the controller knows which is which. */
 reviewRouter.route("/:id")
-    .patch(updateReviewById)
-    .delete(deleteReviewById);
+    .patch(writeLimiter, updateReviewById)
+    .delete(writeLimiter, deleteReviewById);
 
 module.exports = reviewRouter;

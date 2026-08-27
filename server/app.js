@@ -16,15 +16,23 @@ const AppError = require("./utils/AppError.util");
 const catchAsync = require("./utils/catchAsync.util");
 const cors = require("cors");
 const passport = require("passport");
+const mongodbMiddlware = require("./middlewares/secure.middleware");
+const helmet = require("helmet");
+const { globalLimiter } = require("./middlewares/rateLimit.middleware");
 require("./configs/passport.config");
 
 const app = express();
 
-/* Behind Vercel's edge network every request arrives through a proxy. Without
-   this, req.protocol reads "http" on an https request and req.ip is the
-   proxy's, which would make a Secure cookie look wrong to Express and hide the
-   caller's address from anything that logs it. */
-app.set("trust proxy", true);
+/* Behind Vercel's edge network every request arrives through a proxy, so
+   without this req.protocol reads "http" on an https request.
+ 
+   One hop, not `true`. `true` tells Express to believe the whole
+   X-Forwarded-For chain, including the part any caller can write for
+   themselves — which would let anyone choose what req.ip says about them. The
+   rate limiter does not read req.ip for exactly that reason (see
+   clientIp.util), but leaving the door open for everything else that might is
+   not worth the two characters saved. */
+app.set("trust proxy", 1);
 
 /**
  * Which origins may call this API with credentials.
@@ -107,11 +115,30 @@ app.use(cors({
     credentials: true
 }))
 
+app.use(helmet());
+
 app.use(passport.initialize())
 
 
-app.use(express.json());
+/**
+ * `verify` keeps the untouched bytes on the request.
+ *
+ * Stripe signs the exact body it sent, so verifying a webhook means hashing
+ * those bytes — and by the time JSON.parse has turned them into an object and
+ * something has stringified them back, key order and whitespace may differ and
+ * the signature will never match. Parsing normally and keeping a copy is what
+ * lets the webhook verify while every other route still gets a plain req.body.
+ */
+app.use(express.json({
+    verify: (req, res, buffer) => {
+        if (req.originalUrl.startsWith("/api/orders/webhook")) {
+            req.rawBody = buffer;
+        }
+    }
+}));
+
 app.use(cookieParser());
+app.use(mongodbMiddlware);
 
 /**
  * Nothing below can answer without the database, so the connection is opened
@@ -144,6 +171,19 @@ app.get("/api/health", (req, res) => {
         }
     });
 });
+
+/**
+ * Rate limiting, from here down.
+ *
+ * Placed after the database gate because the counters live in MongoDB — a
+ * limiter that cannot reach its store cannot decide anything. Placed after
+ * /api/health so an uptime check is never the request that gets refused.
+ *
+ * This is the blanket budget only. The routes actually worth attacking —
+ * signing in, anything that sends an email, uploads — carry their own, much
+ * tighter, limits declared alongside them in the routers.
+ */
+app.use(globalLimiter);
 
 /* Uploaded photography now lives in MongoDB and is served by the media router,
    because a serverless filesystem does not survive the request that wrote to

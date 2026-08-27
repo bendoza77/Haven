@@ -515,7 +515,7 @@
   "checkout": {
     "title": "Checkout",
     "metaDescription": "Customer details, delivery options and payment.",
-    "intro": "Your order is recorded for real. No payment provider is connected, so no money is taken.",
+    "intro": "Where the parcel goes and how it gets there. Payment is taken securely by Stripe on the next step.",
     "steps": {
       "customer": "Customer information",
       "shipping": "Shipping address",
@@ -541,21 +541,8 @@
     "country": "Country",
     "saveAddress": "Save this address to my account",
     "missingFields": "Fill in the recipient, street address, city, postcode and country.",
-    "couldNotPlace": "Could not place the order",
-    "cardNumber": "Card number",
-    "cardNumberPlaceholder": "0000 0000 0000 0000",
-    "cardExpiry": "Expiry",
-    "cardExpiryPlaceholder": "MM / YY",
-    "cardCvc": "Security code",
-    "cardCvcPlaceholder": "123",
-    "paymentNotice": "No payment provider is connected — these fields are not sent anywhere and no money is taken. The order itself is real and will appear in your account.",
-    "placeOrder": "Place order",
-    "placing": "Placing your order…",
+    "couldNotPlace": "Could not start the payment",
     "backToCart": "Back to cart",
-    "thankYou": "Thank you — order {reference}",
-    "confirmationSent": "The studio is packing it now, and a confirmation is on its way to",
-    "viewOrders": "View my orders",
-    "keepShopping": "Keep shopping",
     "inThisOrder": "In this order",
     "qty": "Qty {count}",
     "emptyTitle": "Your bag is empty",
@@ -572,20 +559,22 @@
       "whiteGloveTitle": "White glove delivery",
       "whiteGloveBody": "Two-person team, placed in the room and unpacked"
     },
-    "payment": {
-      "cardTitle": "Credit or debit card",
-      "cardBody": "Visa, Mastercard, Amex",
-      "paypalTitle": "PayPal",
-      "paypalBody": "You will confirm on PayPal",
-      "walletTitle": "Apple Pay / Google Pay",
-      "walletBody": "Pay with your saved wallet"
-    },
     "countries": {
       "United States": "United States",
       "Canada": "Canada",
       "United Kingdom": "United Kingdom",
       "Germany": "Germany",
       "France": "France"
+    },
+    "payWithCard": "Continue to payment",
+    "redirecting": "Taking you to Stripe",
+    "stripe": {
+      "title": "You will pay on Stripe",
+      "body": "Press continue and we will hand you over to Stripe to enter your card. Your details are never sent to us, and nothing is charged until you confirm there.",
+      "secure": "Stripe handles the card details, not this shop.",
+      "cards": "Visa, Mastercard, American Express and Apple Pay.",
+      "cancel": "Change your mind on Stripe's page and your bag comes back untouched.",
+      "notice": "You will come back here as soon as the payment is confirmed."
     }
   },
   "account": {
@@ -676,13 +665,18 @@
       "Delivered": "Delivered",
       "In transit": "In transit",
       "Processing": "Processing",
-      "Cancelled": "Cancelled"
+      "Cancelled": "Cancelled",
+      "Awaiting payment": "Awaiting payment",
+      "Payment failed": "Payment failed"
     },
     "method": {
       "standard": "Standard delivery",
       "express": "Express delivery",
       "white-glove": "White glove delivery"
-    }
+    },
+    "paidBanner": "Payment received. Order {reference} is confirmed and now being prepared.",
+    "awaitingPayment": "This order has not been paid for yet. Start checkout again to complete it.",
+    "paymentFailed": "The payment for this order did not go through. Nothing was charged."
   },
   "addresses": {
     "missingFields": "Fill in the name, recipient, street, city, postcode and country.",
@@ -1349,5 +1343,14 @@
     "dark": "Dark",
     "switchToLight": "Switch to light theme",
     "switchToDark": "Switch to dark theme"
+  },
+  "checkoutFailed": {
+    "title": "Payment not completed",
+    "intro": "Nothing has been charged. The payment was cancelled or your card was not accepted.",
+    "reference": "Order {reference}",
+    "bagKept": "Your bag is exactly as you left it — nothing was removed, and no stock was reserved.",
+    "tryAgain": "Try again",
+    "reviewBag": "Review my bag",
+    "help": "If your card was refused more than once, it is usually worth checking with your bank before trying a third time."
   }
 }

@@ -1,5 +1,5 @@
 import type { Product } from "@/lib/api";
-import { apiBase } from "@/lib/api-url";
+import { apiBase, internalHeaders } from "@/lib/api-url";
 
 /**
  * The storefront's read side of the catalogue.
@@ -19,7 +19,10 @@ let warned = false;
 /** Every product the API holds. A failure yields an empty shop, never a crash. */
 export async function fetchAllProducts(): Promise<Product[]> {
   try {
-    const response = await fetch(`${apiBase()}/products`, { cache: "no-store" });
+    const response = await fetch(`${apiBase()}/products`, {
+      cache: "no-store",
+      headers: internalHeaders(),
+    });
 
     if (!response.ok) throw new Error(`API answered ${response.status}`);
 

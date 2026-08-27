@@ -1,23 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { AlertCircle, Loader2, Package } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Loader2, Package } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import Disclosure from "@/components/ui/Disclosure";
 import EmptyState from "@/components/ui/EmptyState";
 import { api, type Order } from "@/lib/api";
 import { useDates, useMoney } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
-const statusTones = {
+import type { OrderStatus } from "@/lib/api";
+
+const statusTones: Record<OrderStatus, "soft" | "new" | "sale" | "bestseller"> = {
   Delivered: "soft",
   "In transit": "new",
   Processing: "bestseller",
   Cancelled: "sale",
-} as const;
+  /* Neither good news nor bad yet — the quiet tone, so an order mid-payment
+     does not shout louder than one that has actually shipped. */
+  "Awaiting payment": "soft",
+  "Payment failed": "sale",
+};
 
 /**
  * The shopper's real order history.
@@ -28,6 +36,13 @@ const statusTones = {
  */
 export default function AccountOrders() {
   const t = useTranslations("orders");
+  const params = useSearchParams();
+
+  /* Stripe returns the shopper here with the reference it was given. Used only
+     to point at the right row and say the payment went through — the order is
+     already marked paid by the webhook, which is the account that counts.
+     Landing on this URL is not itself proof of anything. */
+  const justPaid = params.get("order");
   const tSummary = useTranslations("summary");
   const money = useMoney();
   const dates = useDates();
@@ -88,109 +103,141 @@ export default function AccountOrders() {
   }
 
   return (
-    <ul className="space-y-4">
-      {orders.map((order) => (
-        <li key={order._id} className="rounded-lg border border-line p-5 sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-ink">{order.reference}</p>
-              <p className="mt-1 text-xs text-ink-subtle">
-                {t("placed", { date: dates.long(order.createdAt) })}
+    <>
+      {justPaid && orders.some((order) => order.reference === justPaid) && (
+        <p className="mb-5 flex items-start gap-2.5 rounded-lg border border-ink/15 bg-surface px-4 py-3.5 text-sm leading-relaxed text-ink">
+          <CheckCircle2 className="mt-px size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+          {t("paidBanner", { reference: justPaid })}
+        </p>
+      )}
+
+      <ul className="space-y-4">
+        {orders.map((order) => (
+          <li
+            key={order._id}
+            className={cn(
+              "rounded-lg border p-5 sm:p-6",
+              order.reference === justPaid ? "border-ink" : "border-line",
+            )}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-ink">{order.reference}</p>
+                <p className="mt-1 text-xs text-ink-subtle">
+                  {t("placed", { date: dates.long(order.createdAt) })}
+                </p>
+              </div>
+              <Badge tone={statusTones[order.status]}>{t(`status.${order.status}`)}</Badge>
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
+              <p className="text-sm text-ink-muted">
+                {t("itemsAndTotal", { count: order.itemCount })} ·{" "}
+                <span className="font-medium text-ink">{money(order.total)}</span>
               </p>
             </div>
-            <Badge tone={statusTones[order.status]}>{t(`status.${order.status}`)}</Badge>
-          </div>
 
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
-            <p className="text-sm text-ink-muted">
-              {t("itemsAndTotal", { count: order.itemCount })} ·{" "}
-              <span className="font-medium text-ink">{money(order.total)}</span>
-            </p>
-          </div>
+            {/* An order can sit unpaid: the session was opened and the shopper
+                walked away, or the card was refused. Saying so is the whole
+                point — otherwise it reads as a placed order that never came. */}
+            {order.status === "Awaiting payment" && (
+              <p className="mt-4 flex items-start gap-2.5 rounded-md bg-surface px-3.5 py-3 text-xs leading-relaxed text-ink-muted">
+                <Clock className="mt-px size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+                {t("awaitingPayment")}
+              </p>
+            )}
 
-          {/* The pieces themselves, so the reference is not the only thing
-              distinguishing one order from another at a glance. */}
-          <ul className="mt-5 space-y-3 border-t border-line pt-5">
-            {order.items.map((item, index) => (
-              <li key={`${item.slug ?? item.name}-${index}`} className="flex items-center gap-3">
-                {item.image ? (
-                  <Image
-                    src={item.image}
-                    alt=""
-                    width={48}
-                    height={48}
-                    className="size-12 shrink-0 rounded-md border border-line object-cover"
-                  />
-                ) : (
-                  <span className="size-12 shrink-0 rounded-md border border-line bg-surface" aria-hidden />
-                )}
+            {order.status === "Payment failed" && (
+              <p className="mt-4 flex items-start gap-2.5 rounded-md border border-danger/25 bg-danger/5 px-3.5 py-3 text-xs leading-relaxed text-ink">
+                <AlertCircle className="mt-px size-3.5 shrink-0 text-danger" strokeWidth={1.75} aria-hidden />
+                {t("paymentFailed")}
+              </p>
+            )}
 
-                <span className="min-w-0 flex-1">
-                  {item.slug ? (
-                    <Link
-                      href={`/product/${item.slug}`}
-                      className="block truncate text-sm text-ink transition-colors hover:text-accent"
-                    >
-                      {item.name}
-                    </Link>
+            {/* The pieces themselves, so the reference is not the only thing
+                distinguishing one order from another at a glance. */}
+            <ul className="mt-5 space-y-3 border-t border-line pt-5">
+              {order.items.map((item, index) => (
+                <li key={`${item.slug ?? item.name}-${index}`} className="flex items-center gap-3">
+                  {item.image ? (
+                    <Image
+                      src={item.image}
+                      alt=""
+                      width={48}
+                      height={48}
+                      className="size-12 shrink-0 rounded-md border border-line object-cover"
+                    />
                   ) : (
-                    <span className="block truncate text-sm text-ink">{item.name}</span>
+                    <span className="size-12 shrink-0 rounded-md border border-line bg-surface" aria-hidden />
                   )}
-                  <span className="block truncate text-xs text-ink-subtle">
-                    {[item.size, item.color].filter(Boolean).join(" · ") || " "}
+
+                  <span className="min-w-0 flex-1">
+                    {item.slug ? (
+                      <Link
+                        href={`/product/${item.slug}`}
+                        className="block truncate text-sm text-ink transition-colors hover:text-accent"
+                      >
+                        {item.name}
+                      </Link>
+                    ) : (
+                      <span className="block truncate text-sm text-ink">{item.name}</span>
+                    )}
+                    <span className="block truncate text-xs text-ink-subtle">
+                      {[item.size, item.color].filter(Boolean).join(" · ") || " "}
+                    </span>
                   </span>
-                </span>
 
-                <span className="shrink-0 text-right text-sm text-ink-muted">
-                  {item.quantity} × {money(item.price)}
-                </span>
-              </li>
-            ))}
-          </ul>
+                  <span className="shrink-0 text-right text-sm text-ink-muted">
+                    {item.quantity} × {money(item.price)}
+                  </span>
+                </li>
+              ))}
+            </ul>
 
-          <div className="mt-4">
-            <Disclosure title={t("deliveryDetails")}>
-              <div className="space-y-3">
-                <p>
-                  {t("deliveryTo", { method: t(`method.${order.deliveryMethod}`) })}{" "}
-                  <span className="text-ink">{order.shipping.recipient}</span>.
-                </p>
+            <div className="mt-4">
+              <Disclosure title={t("deliveryDetails")}>
+                <div className="space-y-3">
+                  <p>
+                    {t("deliveryTo", { method: t(`method.${order.deliveryMethod}`) })}{" "}
+                    <span className="text-ink">{order.shipping.recipient}</span>.
+                  </p>
 
-                <address className="not-italic leading-relaxed">
-                  {order.shipping.line1}
-                  {order.shipping.line2 ? `, ${order.shipping.line2}` : ""}
-                  <br />
-                  {order.shipping.city}
-                  {order.shipping.region ? `, ${order.shipping.region}` : ""} {order.shipping.postcode}
-                  <br />
-                  {order.shipping.country}
-                </address>
+                  <address className="not-italic leading-relaxed">
+                    {order.shipping.line1}
+                    {order.shipping.line2 ? `, ${order.shipping.line2}` : ""}
+                    <br />
+                    {order.shipping.city}
+                    {order.shipping.region ? `, ${order.shipping.region}` : ""} {order.shipping.postcode}
+                    <br />
+                    {order.shipping.country}
+                  </address>
 
-                <dl className="grid gap-1.5 border-t border-line pt-3 text-xs">
-                  {[
-                    { key: "subtotal", label: tSummary("subtotal", { count: order.itemCount }), value: money(order.subtotal) },
-                    {
-                      key: "shipping",
-                      label: tSummary("shipping"),
-                      value: order.shippingCost === 0 ? tSummary("free") : money(order.shippingCost),
-                    },
-                    { key: "tax", label: tSummary("tax"), value: money(order.tax) },
-                  ].map((row) => (
-                    <div key={row.key} className="flex justify-between gap-3">
-                      <dt>{row.label}</dt>
-                      <dd className="text-ink">{row.value}</dd>
+                  <dl className="grid gap-1.5 border-t border-line pt-3 text-xs">
+                    {[
+                      { key: "subtotal", label: tSummary("subtotal", { count: order.itemCount }), value: money(order.subtotal) },
+                      {
+                        key: "shipping",
+                        label: tSummary("shipping"),
+                        value: order.shippingCost === 0 ? tSummary("free") : money(order.shippingCost),
+                      },
+                      { key: "tax", label: tSummary("tax"), value: money(order.tax) },
+                    ].map((row) => (
+                      <div key={row.key} className="flex justify-between gap-3">
+                        <dt>{row.label}</dt>
+                        <dd className="text-ink">{row.value}</dd>
+                      </div>
+                    ))}
+                    <div className="flex justify-between gap-3 border-t border-line pt-1.5 text-sm">
+                      <dt className="font-medium text-ink">{tSummary("total")}</dt>
+                      <dd className="font-medium text-ink">{money(order.total)}</dd>
                     </div>
-                  ))}
-                  <div className="flex justify-between gap-3 border-t border-line pt-1.5 text-sm">
-                    <dt className="font-medium text-ink">{tSummary("total")}</dt>
-                    <dd className="font-medium text-ink">{money(order.total)}</dd>
-                  </div>
-                </dl>
-              </div>
-            </Disclosure>
-          </div>
-        </li>
-      ))}
-    </ul>
+                  </dl>
+                </div>
+              </Disclosure>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
