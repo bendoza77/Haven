@@ -2,6 +2,7 @@ const { default: mongoose } = require("mongoose");
 const Product = require("../models/product.model");
 const catchAsync = require("../utils/catchAsync.util");
 const AppError = require("../utils/AppError.util");
+const Media = require("../models/media.model");
 
 const getProducts = catchAsync(async (req, res, next) => {
 
@@ -198,14 +199,28 @@ const uploadProductImages = catchAsync(async (req, res, next) => {
         return next(new AppError("Choose at least one image", 400));
     }
 
-    /* Built from the incoming request so the same code serves localhost and a
-       deployed host without a second base-url setting to keep in sync. */
-    const base = `${req.protocol}://${req.get("host")}/uploads/products`;
+    /* The bytes go into MongoDB rather than onto disk — see media.model for
+       why — and what comes back is the address each one is served from. */
+    const saved = await Media.create(
+        req.files.map((file) => ({
+            data: file.buffer,
+            contentType: file.mimetype,
+            size: file.size,
+            uploadedBy: req.user?.id
+        }))
+    );
+
+    /* Root-relative on purpose. The storefront reaches the API under its own
+       origin, so a stored "/api/media/<id>" keeps working across preview
+       deployments, a custom domain and localhost without the database holding
+       a hostname that will be wrong tomorrow. MEDIA_BASE_URL overrides it for
+       a deployment that serves the API from somewhere else. */
+    const base = (process.env.MEDIA_BASE_URL || "").replace(/\/+$/, "");
 
     return res.status(201).json({
         status: "succasse",
         message: "Images uploaded successfully",
-        data: req.files.map((file) => `${base}/${file.filename}`)
+        data: saved.map((media) => `${base}/api/media/${media.id}`)
     })
 
 

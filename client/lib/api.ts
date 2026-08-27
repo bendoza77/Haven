@@ -1,3 +1,5 @@
+import { apiBase } from "@/lib/api-url";
+
 export type User = {
   _id: string;
   fullname: string;
@@ -149,12 +151,10 @@ type ApiResponse<T> = {
   message?: string;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const isFormData = options?.body instanceof FormData;
 
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`${apiBase()}${path}`, {
     ...options,
     credentials: "include",
     // The browser has to set the multipart boundary itself, so an upload
@@ -364,15 +364,39 @@ export const api = {
       });
     },
 
-    /** Sends the chosen files and gets back the URLs they are served from. */
-    uploadImages(files: File[]) {
-      const form = new FormData();
-      for (const file of files) form.append("images", file);
+    /**
+     * Sends the chosen files and gets back the URLs they are served from.
+     *
+     * One request per file, deliberately. A serverless function refuses a body
+     * over 4.5 MB, and eight photographs in one multipart body clear that
+     * easily — so a selection that would have failed as a batch succeeds as a
+     * queue. Sequential rather than parallel so a slow connection is not asked
+     * to push every image at once.
+     */
+    async uploadImages(files: File[]) {
+      const urls: string[] = [];
 
-      return request<ApiResponse<string[]>>("/products/upload", {
-        method: "POST",
-        body: form,
-      });
+      for (const file of files) {
+        const form = new FormData();
+        form.append("images", file);
+
+        try {
+          const response = await request<ApiResponse<string[]>>("/products/upload", {
+            method: "POST",
+            body: form,
+          });
+
+          urls.push(...response.data);
+        } catch (failure) {
+          /* One file in a selection of eight is the usual failure — too large,
+             or the wrong kind. Saying which one turns a dead end into a thing
+             the operator can act on. */
+          const reason = failure instanceof Error ? failure.message : String(failure);
+          throw new Error(`${file.name}: ${reason}`);
+        }
+      }
+
+      return { status: "success", data: urls } satisfies ApiResponse<string[]>;
     },
   },
 
@@ -436,4 +460,15 @@ export const api = {
   },
 };
 
-export const googleLoginUrl = `${API_URL}/auth/google/callback`;
+/**
+ * Where the Google button sends the browser.
+ *
+ * This is the route that *starts* the handshake — passport redirects on to
+ * Google from here. The callback route is where Google sends the browser back
+ * afterwards, carrying a code; opening it directly, with no code to exchange,
+ * only ever fails.
+ *
+ * A getter rather than a constant because the base is resolved per call: this
+ * module is imported on the server too, where a relative base is meaningless.
+ */
+export const googleLoginUrl = () => `${apiBase()}/auth/google`;

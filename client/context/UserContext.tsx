@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { apiBase } from "@/lib/api-url";
 import type { User } from "@/lib/api";
 
 /**
@@ -37,8 +38,6 @@ type UserContextValue = {
 
 const UserContext = createContext<UserContextValue | null>(null);
 
-const API = process.env.NEXT_PUBLIC_API_URL;
-
 /**
  * One fetch for all five calls.
  *
@@ -47,7 +46,7 @@ const API = process.env.NEXT_PUBLIC_API_URL;
  * back 401 no matter who is signed in.
  */
 async function send<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
+  const response = await fetch(`${apiBase()}${path}`, {
     ...options,
     credentials: "include",
     headers: options?.body ? { "Content-Type": "application/json" } : undefined,

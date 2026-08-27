@@ -34,7 +34,7 @@ export default function GoogleButton({ label }: { label: string }) {
       size="lg"
       fullWidth
       onClick={() => {
-        window.location.href = googleLoginUrl;
+        window.location.href = googleLoginUrl();
       }}
     >
       <GoogleMark />

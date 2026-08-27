@@ -9,10 +9,12 @@ import type { ConsoleConfig } from "@/lib/console";
 /**
  * Decides who gets to see a console at all.
  *
- * Entry needs two things, not one: a correct password AND a role that may open
- * a console. A signed-in customer has the first and not the second, so `staff`
- * is null for them and ConsoleLogin explains why rather than pretending the
- * password was wrong.
+ * Entry needs two things, not one: a correct password AND the role this
+ * console belongs to. An administrator opens the admin console, a moderator
+ * opens the moderator console, and everybody else — customers included — gets
+ * a form or an explanation instead. The two consoles draw different controls
+ * because they answer to different roles, so letting one role wander into the
+ * other's screens would show somebody affordances their session cannot use.
  *
  * This is not the security boundary. The Express API checks the same role on
  * every request, which is what actually protects the data; this is what stops
@@ -43,7 +45,9 @@ export default function ConsoleGuard({
     );
   }
 
-  if (!staff) {
+  /* ConsoleLogin tells the three refusals apart: nobody signed in, a customer,
+     or staff standing in front of the other console's door. */
+  if (!staff || staff.role !== config.role) {
     return <ConsoleLogin config={config} />;
   }
 

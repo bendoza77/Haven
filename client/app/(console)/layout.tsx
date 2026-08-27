@@ -3,7 +3,7 @@ import { ReviewProvider } from "@/context/ReviewContext";
 import { UserProvider } from "@/context/UserContext";
 
 /**
- * Everything staff-facing sits under one Firebase session.
+ * Everything staff-facing sits under one session.
  *
  * The providers live here rather than in each console's own layout so that
  * moving between /admin-console and /moderator-console does not tear down and

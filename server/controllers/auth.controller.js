@@ -4,6 +4,7 @@ const catchAsync = require("../utils/catchAsync.util");
 const AppError = require("../utils/AppError.util");
 const User = require("../models/user.model");
 const { sendVerificationEmail, sendPasswordResetEmail, sendTwoFactorCodeEmail } = require("../utils/email.util");
+const { sessionCookieOptions } = require("../utils/cookie.util");
 
 const sendSignToken = (user, res) => {
 
@@ -11,9 +12,7 @@ const sendSignToken = (user, res) => {
 
     res.cookie("hv", token, {
         maxAge: ms(process.env.JWT_EXPIRES),
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "prod",
-        sameSite: process.env.NODE_ENV === "prod" ? "None" : "Lax",
+        ...sessionCookieOptions()
     })
 
     
@@ -432,11 +431,12 @@ const autoLogin = catchAsync(async (req, res, next) => {
 
 const logout = catchAsync(async (req, res, next) => {
 
+    /* Cleared with the same attributes it was set with — a browser matches a
+       cookie for deletion on name, path and domain, so a mismatch here would
+       leave the session in place and "sign out" would do nothing. */
     res.cookie("hv", "", {
         maxAge: 0,
-        httpOnly: true,
-        sameSite: process.env.NODE_ENV === "prod" ? "None" : "Lax",
-        secure: process.env.NODE_ENV === "prod"
+        ...sessionCookieOptions()
     });
 
     return res.json({

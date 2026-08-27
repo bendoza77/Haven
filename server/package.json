@@ -4,8 +4,8 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "node --watch app.js",
+    "start": "node server.js",
+    "dev": "node --watch server.js",
     "seed": "node scripts/seed-products.js",
     "grant-role": "node scripts/grant-role.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -31,5 +31,8 @@
     "resend": "^6.22.1",
     "stripe": "^22.6.0",
     "validator": "^13.15.35"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

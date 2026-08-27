@@ -1,4 +1,5 @@
 import type { Product } from "@/lib/api";
+import { apiBase } from "@/lib/api-url";
 
 /**
  * The storefront's read side of the catalogue.
@@ -11,8 +12,6 @@ import type { Product } from "@/lib/api";
  * shop on the next request, not after a revalidation window.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 type ApiList = { status: string; data: Product[] };
 
 let warned = false;
@@ -20,7 +19,7 @@ let warned = false;
 /** Every product the API holds. A failure yields an empty shop, never a crash. */
 export async function fetchAllProducts(): Promise<Product[]> {
   try {
-    const response = await fetch(`${API_URL}/products`, { cache: "no-store" });
+    const response = await fetch(`${apiBase()}/products`, { cache: "no-store" });
 
     if (!response.ok) throw new Error(`API answered ${response.status}`);
 
@@ -32,7 +31,7 @@ export async function fetchAllProducts(): Promise<Product[]> {
     if (!warned) {
       warned = true;
       console.warn(
-        `[catalogue] Could not reach ${API_URL}/products — the shop will render empty. ${
+        `[catalogue] Could not reach ${apiBase()}/products — the shop will render empty. ${
           error instanceof Error ? error.message : error
         }`,
       );

@@ -3,23 +3,30 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { AlertCircle, ArrowLeft, Loader2, Lock, ShieldX } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Loader2, Lock, ShieldX, ShieldAlert } from "lucide-react";
 import TwoFactorForm from "@/components/auth/TwoFactorForm";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Field";
 import { useAuth } from "@/context/AuthContext";
-import { useConsoleAuth } from "@/context/ConsoleAuthContext";
-import type { ConsoleConfig } from "@/lib/console";
+import { isStaff, useConsoleAuth } from "@/context/ConsoleAuthContext";
+import { consoles, type ConsoleConfig } from "@/lib/console";
 import { site } from "@/lib/site";
 
 /**
  * The gate on both consoles.
  *
- * The password is checked by the API, and the role decides the rest: a correct
- * email and password belonging to a customer signs that customer in and still
- * does not open a console. That refusal is drawn below rather than hidden as a
- * failed login, because the credentials were not the problem and saying so
- * saves somebody retyping a password that was right.
+ * The password is checked by the API, and the role decides the rest. There are
+ * three ways in and two ways to be turned away, and they are drawn as three
+ * different screens because they are three different problems:
+ *
+ *   - nobody signed in — the form
+ *   - a customer — the credentials were fine, the account is not staff
+ *   - staff at the wrong door — an administrator on the moderator console, or
+ *     the reverse; their own console is one click away
+ *
+ * None of these is reported as a failed login, because in none of them was the
+ * password the problem, and saying so saves somebody retyping one that was
+ * right.
  *
  * Two-step accounts pass through the same code step as the storefront.
  */
@@ -95,8 +102,63 @@ export default function ConsoleLogin({ config }: { config: ConsoleConfig }) {
     </div>
   );
 
-  /* Signed in, credentials fine, role wrong. The one case where saying exactly
-     what happened is safe: they already proved the account is theirs. */
+  /* Staff, but this is the other console's door. Their own is a click away —
+     being told to sign in again would only land them back here. */
+  if (account && isStaff(account) && account.role !== config.role) {
+    const theirs = account.role === "admin" ? consoles.admin : consoles.moderator;
+
+    return shell(
+      <>
+        <div className="mb-5 flex items-start gap-3">
+          <span
+            aria-hidden
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink/10 text-ink"
+          >
+            <ShieldAlert className="size-4" strokeWidth={1.75} />
+          </span>
+          <div className="min-w-0">
+            <h1 className="font-display text-xl leading-tight tracking-tight text-ink">
+              {t("login.wrongConsoleTitle")}
+            </h1>
+            <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+              {t("login.wrongConsoleBodyBefore")}{" "}
+              <span className="font-medium text-ink">{account.email}</span>
+              {t("login.wrongConsoleBodyAfter", {
+                role: t(`roles.${account.role}`),
+                expected: t(config.roleLabelKey),
+              })}
+            </p>
+          </div>
+        </div>
+
+        <ButtonLink href={theirs.base} fullWidth>
+          {t("login.wrongConsoleAction", { console: t(theirs.labelKey) })}
+          <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
+        </ButtonLink>
+
+        <Button
+          type="button"
+          fullWidth
+          variant="secondary"
+          className="mt-2.5"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await logout();
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? t("login.signingOut") : t("login.signInAsSomebodyElse")}
+        </Button>
+      </>,
+    );
+  }
+
+  /* Signed in, credentials fine, not staff at all. The one case where saying
+     exactly what happened is safe: they already proved the account is theirs. */
   if (account) {
     return shell(
       <>
