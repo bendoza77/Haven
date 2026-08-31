@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { Suspense, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Check, Globe } from "lucide-react";
@@ -59,12 +59,48 @@ function useLocaleSwitch() {
 const iconAction =
   "flex size-10 items-center justify-center rounded-md text-ink transition-colors hover:bg-surface";
 
+function LanguageToggleFallback({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(iconAction, "gap-1.5 px-2 opacity-60 sm:w-auto", className)}
+    >
+      <Globe className="size-5 shrink-0" strokeWidth={1.75} />
+      <span className="text-xs font-medium tabular-nums">…</span>
+    </span>
+  );
+}
+
+function LanguageChoiceFallback() {
+  return (
+    <div aria-hidden className="flex gap-1 rounded-md bg-surface p-1 opacity-60">
+      {locales.map((locale) => (
+        <span
+          key={locale}
+          className="flex flex-1 items-center justify-center gap-2 rounded-sm px-3 py-2 text-sm text-ink-muted"
+        >
+          <Globe className="size-4" strokeWidth={1.75} />
+          {localeLabels[locale].native}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /**
  * Header control. Two languages means a toggle rather than a menu: one press
  * is the whole interaction, and the label always names the language you would
  * be switching *to*.
  */
 export function LanguageToggle({ className }: { className?: string }) {
+  return (
+    <Suspense fallback={<LanguageToggleFallback className={className} />}>
+      <LanguageToggleInner className={className} />
+    </Suspense>
+  );
+}
+
+function LanguageToggleInner({ className }: { className?: string }) {
   const t = useTranslations("language");
   const { active, pending, switchTo } = useLocaleSwitch();
 
@@ -94,6 +130,14 @@ export function LanguageToggle({ className }: { className?: string }) {
  * legible to someone who cannot read the current one.
  */
 export function LanguageChoice() {
+  return (
+    <Suspense fallback={<LanguageChoiceFallback />}>
+      <LanguageChoiceInner />
+    </Suspense>
+  );
+}
+
+function LanguageChoiceInner() {
   const t = useTranslations("language");
   const { active, pending, switchTo } = useLocaleSwitch();
 
