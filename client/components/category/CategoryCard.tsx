@@ -1,6 +1,6 @@
 import { useTranslations } from "next-intl";
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { ArrowUpRight } from "lucide-react";
 import type { Category } from "@/data/catalog";
 import { cn } from "@/lib/utils";

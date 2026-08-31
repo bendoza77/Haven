@@ -1,37 +1,15 @@
-import {
-  defaultLocale,
-  isLocale,
-  localeCookie,
-  localeCookieMaxAge,
-  type Locale,
-} from "@/i18n/config";
-
-/**
- * The locale lives in a cookie because the server needs it: most of this app
- * renders on the server, so the dictionary is chosen before any JavaScript
- * runs. The helpers below are the only place that cookie is written.
- */
-export function readLocaleCookie(): Locale {
-  if (typeof document === "undefined") return defaultLocale;
-
-  const match = document.cookie
-    .split("; ")
-    .find((entry) => entry.startsWith(`${localeCookie}=`));
-
-  const value = match?.slice(localeCookie.length + 1);
-  return isLocale(value) ? value : defaultLocale;
-}
-
-export function writeLocaleCookie(locale: Locale) {
-  // `SameSite=Lax` so the choice survives a normal navigation back from an
-  // external payment or OAuth hop, without riding along on cross-site posts.
-  document.cookie = `${localeCookie}=${locale}; path=/; max-age=${localeCookieMaxAge}; SameSite=Lax`;
-}
+import type { Locale } from "@/i18n/config";
 
 /**
  * The document language drives font selection, hyphenation and the CSS that
- * de-tracks Georgian, so it is set eagerly rather than waiting for the server
- * round-trip that `router.refresh()` starts.
+ * de-tracks Georgian, so the switcher sets it eagerly rather than waiting for
+ * the navigation to commit — otherwise Georgian gets one paint in a font that
+ * has no glyphs for it.
+ *
+ * Reading and writing the locale cookie used to live here too. It does not any
+ * more: the locale is in the URL, and the cookie — which now only decides
+ * where to send someone who asks for a bare path — is written by the
+ * middleware, where the decision is actually made.
  */
 export function applyDocumentLocale(locale: Locale) {
   document.documentElement.lang = locale;

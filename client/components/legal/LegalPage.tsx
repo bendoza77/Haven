@@ -1,5 +1,5 @@
 import { useTranslations } from "next-intl";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import Breadcrumb from "@/components/ui/Breadcrumb";
 import Container from "@/components/ui/Container";
 

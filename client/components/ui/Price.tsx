@@ -1,8 +1,15 @@
-"use client";
-
 import { useMoney } from "@/lib/format";
 import { cn, discountPercent } from "@/lib/utils";
 
+/**
+ * A price, written the way the reader's language writes prices.
+ *
+ * A Server Component: there is nothing interactive here, and it is rendered
+ * once per product card on pages that show twelve of them. It used to be a
+ * Client Component purely because `useMoney` lived behind a "use client"
+ * boundary — so the whole grid of prices shipped and hydrated to do formatting
+ * the server had already done.
+ */
 export default function Price({
   price,
   previousPrice,

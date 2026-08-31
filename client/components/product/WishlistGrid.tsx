@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { Check, Heart, Loader2, X } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/Button";

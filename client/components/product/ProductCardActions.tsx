@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { Check, Heart, Loader2, ShoppingBag } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";

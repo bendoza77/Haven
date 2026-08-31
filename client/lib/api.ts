@@ -352,24 +352,33 @@ export const api = {
     },
 
     /** Admin and moderator. */
-    create(payload: ProductInput) {
-      return request<ApiResponse<Product>>("/products", {
+    async create(payload: ProductInput) {
+      const created = await request<ApiResponse<Product>>("/products", {
         method: "POST",
         body: JSON.stringify(payload),
       });
+
+      purgeCatalogue();
+      return created;
     },
 
     /** Admin only — the server refuses everyone else. */
-    update(id: string, payload: ProductInput) {
-      return request<ApiResponse<Product>>(`/products/${id}`, {
+    async update(id: string, payload: ProductInput) {
+      const updated = await request<ApiResponse<Product>>(`/products/${id}`, {
         method: "PATCH",
         body: JSON.stringify(payload),
       });
+
+      purgeCatalogue();
+      return updated;
     },
 
     /** Admin only. */
-    remove(id: string) {
-      return request<ApiResponse<null>>(`/products/${id}`, { method: "DELETE" });
+    async remove(id: string) {
+      const removed = await request<ApiResponse<null>>(`/products/${id}`, { method: "DELETE" });
+
+      purgeCatalogue();
+      return removed;
     },
 
     /** Public — every review on one piece, newest first. Accepts a slug or an id. */
@@ -378,11 +387,16 @@ export const api = {
     },
 
     /** Writes a review as the signed-in shopper. The author comes from the session. */
-    addReview(idOrSlug: string, payload: ReviewInput) {
-      return request<ApiResponse<Review>>(`/products/${idOrSlug}/reviews`, {
+    async addReview(idOrSlug: string, payload: ReviewInput) {
+      const created = await request<ApiResponse<Review>>(`/products/${idOrSlug}/reviews`, {
         method: "POST",
         body: JSON.stringify(payload),
       });
+
+      /* The product page renders its reviews on the server now, so a new one
+         has to invalidate that render as well as the list this screen holds. */
+      purgeCatalogue();
+      return created;
     },
 
     /**
@@ -481,16 +495,22 @@ export const api = {
     },
 
     /** The author may edit their own; an admin may edit anybody's. */
-    update(id: string, payload: Partial<ReviewInput>) {
-      return request<ApiResponse<Review>>(`/reviews/${id}`, {
+    async update(id: string, payload: Partial<ReviewInput>) {
+      const updated = await request<ApiResponse<Review>>(`/reviews/${id}`, {
         method: "PATCH",
         body: JSON.stringify(payload),
       });
+
+      purgeCatalogue();
+      return updated;
     },
 
     /** The author may remove their own; an admin may remove anybody's. */
-    remove(id: string) {
-      return request<ApiResponse<null>>(`/reviews/${id}`, { method: "DELETE" });
+    async remove(id: string) {
+      const removed = await request<ApiResponse<null>>(`/reviews/${id}`, { method: "DELETE" });
+
+      purgeCatalogue();
+      return removed;
     },
   },
 };
@@ -506,4 +526,23 @@ export const api = {
  * A getter rather than a constant because the base is resolved per call: this
  * module is imported on the server too, where a relative base is meaningless.
  */
+/**
+ * Tells the storefront that the catalogue it cached is out of date.
+ *
+ * The shop caches the product list so a page can render without waiting on
+ * the API; that is only safe if a write can drop the cache, which is what this
+ * asks for. Fire-and-forget on purpose — the save has already succeeded by the
+ * time it runs, and a console operator should not be shown an error because a
+ * cache purge was slow. Worst case the shop is a minute behind, which is where
+ * it would have been anyway.
+ *
+ * Server-side callers skip it: nothing renders a console on the server, and
+ * `/internal/revalidate` is relative to a document that does not exist there.
+ */
+function purgeCatalogue() {
+  if (typeof window === "undefined") return;
+
+  void fetch("/internal/revalidate", { method: "POST", credentials: "include" }).catch(() => {});
+}
+
 export const googleLoginUrl = () => `${apiBase()}/auth/google`;

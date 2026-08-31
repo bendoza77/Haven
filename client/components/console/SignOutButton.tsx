@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { LogOut } from "lucide-react";
 import { useConsoleAuth } from "@/context/ConsoleAuthContext";

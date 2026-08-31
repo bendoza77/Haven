@@ -1,5 +1,5 @@
 import { useTranslations } from "next-intl";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { categories } from "@/data/catalog";
 import { buildQuery } from "@/lib/shop";
 import { cn } from "@/lib/utils";

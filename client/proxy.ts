@@ -1,4 +1,16 @@
+import createIntlMiddleware from "next-intl/middleware";
 import { NextResponse, type NextRequest } from "next/server";
+import { routing } from "./i18n/routing";
+
+/**
+ * Two jobs, told apart by the path.
+ *
+ * /api/* is the Express API, proxied through this deployment, and needs the
+ * caller's address forwarded — see `apiProxy` below. Everything else is a page,
+ * and needs a locale decided before a route is matched.
+ */
+
+/* ------------------------------------------------------------ the API */
 
 /**
  * Tells the API who is actually calling it.
@@ -68,7 +80,7 @@ function clientIp(request: NextRequest) {
   return forwarded?.split(",")[0]?.trim() ?? "";
 }
 
-export function proxy(request: NextRequest) {
+function apiProxy(request: NextRequest) {
   const headers = new Headers(request.headers);
 
   for (const header of SPOOFABLE) headers.delete(header);
@@ -92,7 +104,42 @@ export function proxy(request: NextRequest) {
   return NextResponse.next({ request: { headers } });
 }
 
+/* ----------------------------------------------------------- the pages */
+
+/**
+ * Decides the language of a page request before a route is matched.
+ *
+ * A URL that names its locale is taken at its word. One that does not is
+ * English — the default prefix is omitted, so `/shop` is a real English
+ * address and not an ambiguity — except on the very first visit, where the
+ * stored choice or the browser's Accept-Language sends a Georgian reader to
+ * `/ka/shop` instead of showing them English and hoping they find the switch.
+ *
+ * This is also the only place the locale cookie is written now. It used to be
+ * the source of truth, which meant the language of a page could not be read
+ * off its address; it is now a record of a preference, used to route a bare
+ * URL and nothing more.
+ */
+const intlMiddleware = createIntlMiddleware(routing);
+
+export function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith("/api/")) return apiProxy(request);
+
+  return intlMiddleware(request);
+}
+
 export const config = {
-  /* Only the proxied API. Page requests have nothing downstream to tell. */
-  matcher: "/api/:path*",
+  /*
+   * The proxied API, plus every page.
+   *
+   * The negative lookahead is what keeps this off the hot path for everything
+   * that is not a page: built assets, the image optimiser, the metadata files
+   * Next serves from the app root, and anything with a file extension. Running
+   * locale negotiation on a request for a font would cost real milliseconds and
+   * decide nothing.
+   */
+  matcher: [
+    "/api/:path*",
+    "/((?!_next/|_vercel/|internal/|icon\.svg|apple-icon|favicon\.ico|robots\.txt|sitemap\.xml|.*\..*).*)",
+  ],
 };

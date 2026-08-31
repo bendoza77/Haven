@@ -1,43 +1,27 @@
-import { cookies, headers } from "next/headers";
 import { getRequestConfig } from "next-intl/server";
-import { defaultLocale, isLocale, localeCookie, locales, type Locale } from "./config";
+import { hasLocale } from "next-intl";
+import { routing } from "./routing";
 
 /**
- * Second-guess the cookie with the browser's own preference, so a first-time
- * Georgian visitor is not shown English before they find the switcher. Parsed
- * by hand rather than pulled in as a dependency: the header is small and the
- * quality-value grammar is two rules wide.
+ * The dictionary and the formats for one request.
+ *
+ * The locale is read from the `[locale]` route segment rather than from
+ * cookies and Accept-Language. That is not a tidying-up: `cookies()` and
+ * `headers()` are dynamic functions, and calling either here opted every route
+ * in the app — the privacy page, the sign-in page, the 404 — into being
+ * re-rendered per request, because this config runs on every render there is.
+ * Reading the segment instead lets a page be prerendered and served from the
+ * edge. Negotiating from the cookie and the browser's preference still
+ * happens; it happens once, in the middleware, which is where a redirect can
+ * actually be issued.
+ *
+ * The whole dictionary is loaded here, and that is fine — this runs on the
+ * server and none of it crosses the wire. What reaches the browser is chosen
+ * deliberately in i18n/messages.ts.
  */
-function fromAcceptLanguage(header: string | null): Locale | undefined {
-  if (!header) return undefined;
-
-  const ranked = header
-    .split(",")
-    .map((part) => {
-      const [tag, ...params] = part.trim().split(";");
-      const q = params.find((p) => p.trim().startsWith("q="));
-      return { tag: tag.trim().toLowerCase(), q: q ? Number(q.split("=")[1]) : 1 };
-    })
-    .filter((entry) => entry.tag && !Number.isNaN(entry.q))
-    .sort((a, b) => b.q - a.q);
-
-  // Match on the primary subtag so "ka-GE" and "en-US" both land.
-  for (const { tag } of ranked) {
-    const base = tag.split("-")[0];
-    const hit = locales.find((locale) => locale === base);
-    if (hit) return hit;
-  }
-
-  return undefined;
-}
-
-export default getRequestConfig(async () => {
-  const [cookieStore, headerStore] = await Promise.all([cookies(), headers()]);
-
-  const stored = cookieStore.get(localeCookie)?.value;
-  const locale = isLocale(stored)
-    ? stored
-    : (fromAcceptLanguage(headerStore.get("accept-language")) ?? defaultLocale);
+export default getRequestConfig(async ({ requestLocale }) => {
+  const requested = await requestLocale;
+  const locale = hasLocale(routing.locales, requested) ? requested : routing.defaultLocale;
 
   return {
     locale,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { AlertCircle, ArrowLeft, ArrowRight, Loader2, Lock, ShieldX, ShieldAlert } from "lucide-react";
 import TwoFactorForm from "@/components/auth/TwoFactorForm";

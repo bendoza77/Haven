@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { AlertCircle, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react";
 import ConfirmDialog from "@/components/console/ConfirmDialog";

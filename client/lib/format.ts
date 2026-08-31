@@ -1,5 +1,3 @@
-"use client";
-
 import { useFormatter } from "next-intl";
 
 /**
@@ -16,6 +14,13 @@ import { useFormatter } from "next-intl";
  * well, so the same hook works in a sync Server Component and in a Client
  * Component — which is exactly the mix that renders prices here. Only async
  * Server Components need `getFormatter` instead.
+ *
+ * This module deliberately carries no "use client". It had one, and a
+ * directive at the top of a module is not a note about where it runs — it is
+ * a boundary. Every component that imported a formatter from here was pulled
+ * into the client bundle with it, `Price` above all, which meant every price
+ * on every product card hydrated in order to call `Intl.NumberFormat`. Without
+ * the directive both builds resolve, and each caller decides for itself.
  */
 
 /** Prices stay in USD — the store sells in dollars — but format per locale. */

@@ -2,33 +2,54 @@
 
 import { useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Check, Globe } from "lucide-react";
 import { locales, localeLabels, type Locale } from "@/i18n/config";
-import { applyDocumentLocale, writeLocaleCookie } from "@/lib/locale";
+import { usePathname, useRouter } from "@/i18n/navigation";
+import { applyDocumentLocale } from "@/lib/locale";
 import { cn } from "@/lib/utils";
 
 /**
- * Switching language is a server concern here: most of the shop renders on
- * the server, so the new dictionary arrives with a refresh rather than from a
- * client-side store. `useTransition` keeps the old text on screen — and
- * interactive — while that round-trip is in flight, instead of blanking the
- * page. The `lang` attribute is set immediately so the Georgian font and the
- * :lang(ka) type rules apply to the incoming markup, not one paint later.
+ * Switching language is a navigation now, not a refresh.
+ *
+ * It used to write a cookie and call `router.refresh()`, which threw away the
+ * whole payload for the current route and asked the server to build it again:
+ * every product query on the page re-ran uncached, and the entire dictionary
+ * was re-serialised — 118 kB of it in Georgian — before a single word changed
+ * on screen. The locale was in a cookie, so Next had nothing it could cache
+ * per language and did the same work on every switch.
+ *
+ * Each language now has its own URL, so this is an ordinary client navigation
+ * to a sibling route. Next has usually prefetched it already, the data behind
+ * it is cached, and only the messages that page's client components need cross
+ * the wire. `useTransition` keeps the current text on screen and interactive
+ * while that happens rather than blanking the page.
+ *
+ * The `lang` attribute is still set by hand and immediately: it drives the
+ * Georgian font stack and the `:lang(ka)` type rules, and waiting for the new
+ * document to commit would show one paint of Georgian in Latin metrics.
  */
 function useLocaleSwitch() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const active = useLocale() as Locale;
   const [pending, startTransition] = useTransition();
 
   const switchTo = (next: Locale) => {
     if (next === active) return;
 
-    writeLocaleCookie(next);
     applyDocumentLocale(next);
 
+    /* `pathname` here has no locale on it — it is the route as the app names
+       it — so the same address is simply re-asked for in the other language.
+       The query string is carried across by hand: a shopper switching language
+       half way down a filtered, sorted, paginated shop expects to still be
+       looking at it. */
+    const query = searchParams.toString();
+
     startTransition(() => {
-      router.refresh();
+      router.replace(query ? `${pathname}?${query}` : pathname, { locale: next });
     });
   };
 

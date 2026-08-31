@@ -6,10 +6,32 @@
  * resolve them against the `nav` namespace, so adding a language never means
  * editing this file.
  */
+
+/**
+ * Where this deployment answers, with no trailing slash.
+ *
+ * Every absolute URL the shop publishes is built from it: the canonical link
+ * on each page, the hreflang alternates, the sitemap, the Open Graph tags and
+ * the structured data. Search engines treat those as identity, so a wrong
+ * value here is worse than none — it points the index at somewhere that is not
+ * the shop.
+ *
+ * NEXT_PUBLIC_ because the client bundle links to it too. It is a public
+ * address, not a secret. On Vercel the preview URL is used when nothing is
+ * configured, which keeps previews self-consistent; localhost is the last
+ * resort so a developer never sees a production hostname in dev markup.
+ */
+export const siteUrl = (
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : "") ??
+  ""
+).replace(/\/+$/, "") || "http://localhost:3000";
+
 export const site = {
   name: "Haven",
   email: "hello@haven.store",
   phone: "+1 (555) 010-2400",
+  url: siteUrl,
 } as const;
 
 export const mainNav = [

@@ -1,5 +1,5 @@
 import { useTranslations } from "next-intl";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { ArrowLeft, Check, ShieldCheck } from "lucide-react";
 import { site } from "@/lib/site";
 
