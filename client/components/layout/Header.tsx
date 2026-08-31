@@ -1,5 +1,5 @@
 import { Link } from "@/i18n/navigation";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Search } from "lucide-react";
 import AuthNav from "@/components/auth/AuthNav";
 import HeaderActions from "@/components/layout/HeaderActions";
@@ -8,12 +8,15 @@ import NavLink from "@/components/layout/NavLink";
 import Container from "@/components/ui/Container";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
+import type { Locale } from "@/i18n/config";
+import { localePath } from "@/lib/seo";
 import { mainNav, site } from "@/lib/site";
 
 const iconAction =
   "flex size-10 items-center justify-center rounded-md text-ink transition-colors hover:bg-surface";
 
 export default async function Header() {
+  const locale = (await getLocale()) as Locale;
   const t = await getTranslations("header");
   const tNav = await getTranslations("nav");
 
@@ -48,7 +51,11 @@ export default async function Header() {
             </nav>
 
             <div className="ml-auto flex items-center gap-1 sm:gap-2">
-              <form action="/search" role="search" className="relative hidden xl:block">
+              <form
+                action={localePath(locale, "/search")}
+                role="search"
+                className="relative hidden xl:block"
+              >
                 <label htmlFor="header-search" className="sr-only">
                   {t("searchProducts")}
                 </label>

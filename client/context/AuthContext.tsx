@@ -46,9 +46,16 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+let cachedAccount: Account | null = null;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<Account | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<Account | null>(() => cachedAccount);
+  const [loading, setLoading] = useState(() => cachedAccount === null);
+
+  const setAccount = useCallback((account: Account | null) => {
+    cachedAccount = account;
+    setUser(account);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,10 +63,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api
       .autoLogin()
       .then((response) => {
-        if (!cancelled) setUser(response.data);
+        if (!cancelled) setAccount(response.data);
       })
       .catch(() => {
-        if (!cancelled) setUser(null);
+        if (!cancelled) setAccount(null);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -68,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setAccount]);
 
   const login = useCallback(async (email: string, password: string) => {
     const response = await api.login(email, password);
@@ -79,14 +86,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { twoFactorRequired: true };
     }
 
-    setUser(response.data);
+    setAccount(response.data);
     return { twoFactorRequired: false };
-  }, []);
+  }, [setAccount]);
 
   const verifyTwoFactor = useCallback(async (email: string, code: string) => {
     const response = await api.verifyTwoFactor(email, code);
-    setUser(response.data);
-  }, []);
+    setAccount(response.data);
+  }, [setAccount]);
 
   /**
    * Creates the account only. No session starts here — the shopper is signed
@@ -99,19 +106,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await api.logout();
-    setUser(null);
-  }, []);
+    setAccount(null);
+  }, [setAccount]);
 
   const refresh = useCallback(async () => {
     try {
       const response = await api.account.me();
-      setUser(response.data);
+      setAccount(response.data);
     } catch {
-      setUser(null);
+      setAccount(null);
     }
-  }, []);
+  }, [setAccount]);
 
-  const adopt = useCallback((account: Account) => setUser(account), []);
+  const adopt = useCallback((account: Account) => setAccount(account), [setAccount]);
 
   /* Every mutation below is guarded on being signed in: the bag belongs to an
      account, so there is nothing to write to without one. Callers check first
@@ -134,36 +141,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ? await api.account.removeFavorite(productId)
         : await api.account.addFavorite(productId);
 
-      setUser(response.data);
+      setAccount(response.data);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, isFavorite],
+    [user, isFavorite, setAccount],
   );
 
   const addToCart: AuthContextValue["addToCart"] = useCallback(
     async (payload) => {
       requireUser();
       const response = await api.account.addToCart(payload);
-      setUser(response.data);
+      setAccount(response.data);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user],
+    [user, setAccount],
   );
 
   const updateCartItem = useCallback(async (itemId: string, quantity: number) => {
     const response = await api.account.updateCartItem(itemId, quantity);
-    setUser(response.data);
-  }, []);
+    setAccount(response.data);
+  }, [setAccount]);
 
   const removeCartItem = useCallback(async (itemId: string) => {
     const response = await api.account.removeCartItem(itemId);
-    setUser(response.data);
-  }, []);
+    setAccount(response.data);
+  }, [setAccount]);
 
   const clearCart = useCallback(async () => {
     const response = await api.account.clearCart();
-    setUser(response.data);
-  }, []);
+    setAccount(response.data);
+  }, [setAccount]);
 
   const cartCount = useMemo(
     () => user?.cart?.reduce((count, line) => count + line.quantity, 0) ?? 0,

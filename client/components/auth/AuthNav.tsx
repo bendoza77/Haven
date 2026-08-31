@@ -11,7 +11,7 @@ export default function AuthNav() {
   const router = useRouter();
   const { user, loading, logout } = useAuth();
 
-  if (loading) {
+  if (loading && !user) {
     return <span className="h-9 w-40 animate-pulse rounded-md bg-surface" />;
   }
 

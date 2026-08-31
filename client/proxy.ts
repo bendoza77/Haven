@@ -110,10 +110,8 @@ function apiProxy(request: NextRequest) {
  * Decides the language of a page request before a route is matched.
  *
  * A URL that names its locale is taken at its word. One that does not is
- * English — the default prefix is omitted, so `/shop` is a real English
- * address and not an ambiguity — except on the very first visit, where the
- * stored choice or the browser's Accept-Language sends a Georgian reader to
- * `/ka/shop` instead of showing them English and hoping they find the switch.
+ * routed to a concrete locale URL, so `/shop` becomes `/en/shop` or `/ka/shop`
+ * depending on the stored choice or the browser's Accept-Language.
  *
  * This is also the only place the locale cookie is written now. It used to be
  * the source of truth, which meant the language of a page could not be read

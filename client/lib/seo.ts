@@ -16,16 +16,15 @@ import { siteUrl } from "@/lib/site";
  *   languages  — every translation of this page, each pointing at all the
  *                others. Google discards a set where the references are not
  *                mutual, so they are always generated together, never by hand.
- *   x-default  — where to send someone whose language is neither, which is
- *                the English URL because that is what an unprefixed path
- *                already resolves to.
+ *   x-default  — where to send someone whose language is neither: the English
+ *                URL, which is explicitly prefixed like every other route.
  *
  * `path` is the app's own route — "/shop", "/product/oak-chair" — with no
  * locale on it. This is the only place a prefix is added.
  */
 export function localePath(locale: Locale, path: string) {
   const clean = path === "/" ? "" : path.replace(/\/+$/, "");
-  return locale === defaultLocale ? clean || "/" : `/${locale}${clean}`;
+  return `/${locale}${clean}`;
 }
 
 export function absoluteUrl(locale: Locale, path: string) {

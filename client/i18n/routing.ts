@@ -4,9 +4,11 @@ import { defaultLocale, localeCookie, localeCookieMaxAge, locales } from "./conf
 /**
  * How a locale is expressed in a URL.
  *
- * `as-needed` keeps English on the paths it has always had — /shop stays
- * /shop — and gives Georgian its own: /ka/shop. Nothing that was already
- * linked to, bookmarked or indexed moves.
+ * `always` gives both languages concrete route URLs: /en/shop and /ka/shop.
+ * That matters in production because the route tree itself lives under
+ * app/[locale]. A bare English URL such as /shop only works if locale
+ * middleware rewrites it first; a prefixed URL works even when Vercel is asked
+ * for that address directly.
  *
  * Putting the locale in the path rather than in a cookie alone is what makes
  * the two expensive problems go away at once. Switching language becomes a
@@ -23,7 +25,7 @@ import { defaultLocale, localeCookie, localeCookieMaxAge, locales } from "./conf
 export const routing = defineRouting({
   locales,
   defaultLocale,
-  localePrefix: "as-needed",
+  localePrefix: "always",
   localeCookie: {
     name: localeCookie,
     maxAge: localeCookieMaxAge,

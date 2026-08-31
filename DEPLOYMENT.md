@@ -378,7 +378,7 @@ session works without it.
 | --- | --- | --- |
 | API is alive | `https://haven-api.vercel.app/api/health` | `database: "connected"` |
 | Proxy is wired | `https://haven.vercel.app/api/health` | the same JSON |
-| Catalogue renders | `https://haven.vercel.app/shop` | products, not an empty grid |
+| Catalogue renders | `https://haven.vercel.app/en/shop` | products, not an empty grid |
 | Session survives | sign in, then reload | still signed in |
 | Admin console | `/admin-console` as an admin | the dashboard |
 | Moderator console | `/moderator-console` as a moderator | the dashboard |
