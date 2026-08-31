@@ -10,7 +10,7 @@ export function generateStaticParams() {
   return categories.map((category) => ({ slug: category.slug }));
 }
 
-export async function generateMetadata(props: PageProps<"/category/[slug]">) {
+export async function generateMetadata(props: PageProps<"/[locale]/category/[slug]">) {
   const { slug } = await props.params;
   const category = getCategory(slug);
   if (!category) return {};
@@ -19,7 +19,7 @@ export async function generateMetadata(props: PageProps<"/category/[slug]">) {
   return { title: t(`${slug}.name`), description: t(`${slug}.description`) };
 }
 
-export default async function CategoryPage(props: PageProps<"/category/[slug]">) {
+export default async function CategoryPage(props: PageProps<"/[locale]/category/[slug]">) {
   const { slug } = await props.params;
   const params = await props.searchParams;
   const category = getCategory(slug);

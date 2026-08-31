@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function AdminConsoleLayout({ children }: LayoutProps<"/admin-console">) {
+export default function AdminConsoleLayout({ children }: LayoutProps<"/[locale]/admin-console">) {
   return (
     <ConsoleGuard config={consoles.admin}>
       <ConsoleShell config={consoles.admin}>{children}</ConsoleShell>

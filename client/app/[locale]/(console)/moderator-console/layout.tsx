@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function ModeratorConsoleLayout({ children }: LayoutProps<"/moderator-console">) {
+export default function ModeratorConsoleLayout({ children }: LayoutProps<"/[locale]/moderator-console">) {
   return (
     <ConsoleGuard config={consoles.moderator}>
       <ConsoleShell config={consoles.moderator}>{children}</ConsoleShell>

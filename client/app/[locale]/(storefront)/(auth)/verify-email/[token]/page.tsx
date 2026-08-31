@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 const HIGHLIGHT_KEYS = ["once", "bag", "nothing"] as const;
 
 export default async function VerifyEmailPage(
-  props: PageProps<"/verify-email/[token]">,
+  props: PageProps<"/[locale]/verify-email/[token]">,
 ) {
   const { token } = await props.params;
 

@@ -29,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function CheckoutFailedPage({
   searchParams,
-}: PageProps<"/checkout/failed">) {
+}: PageProps<"/[locale]/checkout/failed">) {
   const t = await getTranslations("checkoutFailed");
   const { order } = await searchParams;
 

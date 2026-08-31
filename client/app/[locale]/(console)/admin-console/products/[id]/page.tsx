@@ -9,7 +9,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AdminEditProductPage(
-  props: PageProps<"/admin-console/products/[id]">,
+  props: PageProps<"/[locale]/admin-console/products/[id]">,
 ) {
   const { id } = await props.params;
 

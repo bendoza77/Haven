@@ -27,7 +27,7 @@ const suggestions = [
   { key: "jacket", query: "jacket" },
 ] as const;
 
-export default async function SearchPage(props: PageProps<"/search">) {
+export default async function SearchPage(props: PageProps<"/[locale]/search">) {
   const t = await getTranslations("search");
 
   const params = await props.searchParams;

@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 const HIGHLIGHT_KEYS = ["link", "signedIn", "old"] as const;
 
 export default async function ResetPasswordPage(
-  props: PageProps<"/reset-password/[token]">,
+  props: PageProps<"/[locale]/reset-password/[token]">,
 ) {
   const { token } = await props.params;
 

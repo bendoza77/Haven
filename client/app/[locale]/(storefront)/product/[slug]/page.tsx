@@ -28,7 +28,7 @@ const assurances = [
 /* No generateStaticParams: the catalogue is a database the consoles write to,
    so the set of product pages is not known at build time. */
 
-export async function generateMetadata(props: PageProps<"/product/[slug]">) {
+export async function generateMetadata(props: PageProps<"/[locale]/product/[slug]">) {
   const { slug } = await props.params;
   const product = await getProduct(slug);
   if (!product) return {};
@@ -36,7 +36,7 @@ export async function generateMetadata(props: PageProps<"/product/[slug]">) {
   return { title: product.name, description: product.description };
 }
 
-export default async function ProductPage(props: PageProps<"/product/[slug]">) {
+export default async function ProductPage(props: PageProps<"/[locale]/product/[slug]">) {
   const { slug } = await props.params;
   const product = await getProduct(slug);
 

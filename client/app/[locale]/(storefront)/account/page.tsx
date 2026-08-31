@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
 const tabs = ["profile", "orders", "addresses", "settings"] as const;
 type TabId = (typeof tabs)[number];
 
-export default async function AccountPage(props: PageProps<"/account">) {
+export default async function AccountPage(props: PageProps<"/[locale]/account">) {
   const t = await getTranslations("account");
   const tBreadcrumb = await getTranslations("breadcrumb");
 

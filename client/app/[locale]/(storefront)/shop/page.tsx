@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("metaTitle"), description: t("metaDescription") };
 }
 
-export default async function ShopPage(props: PageProps<"/shop">) {
+export default async function ShopPage(props: PageProps<"/[locale]/shop">) {
   const t = await getTranslations("shop");
   const tBreadcrumb = await getTranslations("breadcrumb");
   const tCounts = await getTranslations("counts");

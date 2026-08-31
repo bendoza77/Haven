@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "fail", message: "Not allowed" }, { status: 403 });
   }
 
-  revalidateTag(CATALOGUE_TAG);
+  revalidateTag(CATALOGUE_TAG, { expire: 0 });
 
   return NextResponse.json({ status: "success", data: null });
 }

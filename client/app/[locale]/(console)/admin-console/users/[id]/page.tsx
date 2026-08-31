@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /* The account itself is read in the browser — see UserEditor for why — so the
    title here is the generic one rather than the person's name. */
-export default async function AdminEditUserPage(props: PageProps<"/admin-console/users/[id]">) {
+export default async function AdminEditUserPage(props: PageProps<"/[locale]/admin-console/users/[id]">) {
   const { id } = await props.params;
 
   return <UserEditor config={consoles.admin} id={id} />;

@@ -23,9 +23,9 @@
  */
 export const siteUrl = (
   process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : "") ??
-  ""
-).replace(/\/+$/, "") || "http://localhost:3000";
+  (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : undefined) ??
+  "http://localhost:3000"
+).replace(/\/+$/, "");
 
 export const site = {
   name: "Haven",
