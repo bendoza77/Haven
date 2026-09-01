@@ -25,17 +25,34 @@ import { useDates } from "@/lib/format";
 export default function ProductReviews({
   slug,
   productName,
+  initialReviews,
 }: {
   slug: string;
   productName: string;
+  /**
+   * What the server already read, so the list is in the HTML.
+   *
+   * This component used to fetch on mount, which meant three things had to
+   * happen before a single review appeared: the bundle downloaded, React
+   * hydrated, and a request went to the API and came back. A crawler saw none
+   * of it, and neither did a reader for the first second or two of a page
+   * whose whole purpose is to help them decide. The server has the list by the
+   * time it writes the markup — see fetchReviews in lib/products.ts — so it
+   * comes down with the page and the effect below is only a re-read.
+   */
+  initialReviews: Review[];
 }) {
   const t = useTranslations("reviews");
   const tAuth = useTranslations("auth");
   const tCommon = useTranslations("common");
   const { user } = useAuth();
 
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [reviews, setReviews] = useState<Review[]>(initialReviews);
+
+  /* Only ever true when the server had nothing to give — an API that was
+     unreachable during the render. With a seeded list there is nothing to
+     wait for and no spinner to show. */
+  const [loading, setLoading] = useState(initialReviews.length === 0);
   const [error, setError] = useState<string | null>(null);
 
   const [busy, setBusy] = useState(false);
@@ -55,6 +72,12 @@ export default function ProductReviews({
   }, [slug, t]);
 
   useEffect(() => {
+    /* The server's copy is a cached read, up to a minute old. That is right for
+       the markup and wrong for somebody who has just written a review, so this
+       only runs when there was nothing to seed with — otherwise the list is
+       re-read by `load` after a write, which is the moment it can be stale. */
+    if (initialReviews.length > 0) return;
+
     let cancelled = false;
 
     api.products
@@ -74,7 +97,7 @@ export default function ProductReviews({
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, initialReviews.length]);
 
   /* The signed-in shopper's own review, if they have written one. It is drawn
      apart from the others so it can carry the edit and delete controls. */

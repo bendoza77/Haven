@@ -130,14 +130,28 @@ export const config = {
   /*
    * The proxied API, plus every page.
    *
-   * The negative lookahead is what keeps this off the hot path for everything
-   * that is not a page: built assets, the image optimiser, the metadata files
-   * Next serves from the app root, and anything with a file extension. Running
+   * The negative lookahead keeps this off the hot path for everything that is
+   * not a page: built assets, the image optimiser, the metadata files Next
+   * serves from the app root, and anything else with a file extension. Running
    * locale negotiation on a request for a font would cost real milliseconds and
-   * decide nothing.
+   * decide nothing. `apple-icon` is named on its own because it is the one such
+   * file Next serves without an extension (/apple-icon?<hash>), so the final
+   * alternative below does not catch it; icon.svg, favicon.ico, robots.txt and
+   * sitemap.xml all have one and need no special case.
+   *
+   * The doubled backslash is load-bearing. This is a *string*, not a regex
+   * literal, so "\\." is what produces the regex \. — one literal dot.
+   * Written with a single backslash, JavaScript drops it while reading the
+   * string and the pattern Next compiles is `.` — any character at all. That
+   * turned the last alternative from "a path containing a dot" into "a path
+   * containing anything", so the lookahead rejected every non-empty path and
+   * this file ran on none of them. `/` still redirected, because the remainder
+   * there is empty; every other unprefixed address — /account,
+   * /checkout/failed, the URLs Stripe returns a shopper to — fell through to a
+   * route tree that only holds /[locale]/… and answered 404.
    */
   matcher: [
     "/api/:path*",
-    "/((?!_next/|_vercel/|internal/|icon\.svg|apple-icon|favicon\.ico|robots\.txt|sitemap\.xml|.*\..*).*)",
+    "/((?!_next/|_vercel/|internal/|apple-icon|.*\\.).*)",
   ],
 };

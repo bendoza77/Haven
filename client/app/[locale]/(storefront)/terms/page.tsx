@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 import LegalPage, { type LegalSection } from "@/components/legal/LegalPage";
 import { legalTags, legalValues } from "@/components/legal/richText";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("terms");
-  return { title: t("title"), description: t("metaDescription") };
+export async function generateMetadata(props: PageProps<"/[locale]/terms">): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "terms" });
+
+  return pageMetadata({
+    locale,
+    path: "/terms",
+    title: t("title"),
+    description: t("metaDescription"),
+  });
 }
 
 /* Order and anchor ids only. Each id is also the message key for that clause,
@@ -22,7 +30,10 @@ const SECTION_IDS = [
   "changes",
 ] as const;
 
-export default async function TermsPage() {
+export default async function TermsPage({ params }: PageProps<"/[locale]/terms">) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+
   const t = await getTranslations("terms");
   const tFooter = await getTranslations("footer");
 

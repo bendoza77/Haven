@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { AlertCircle, ArrowRight, CreditCard, Loader2, Lock, ShieldCheck } from "lucide-react";
 import CheckoutSummary from "@/components/cart/CheckoutSummary";
 import { Input, Select } from "@/components/ui/Field";
@@ -111,6 +111,7 @@ const FORM_ID = "checkout-form";
  */
 export default function CheckoutFlow() {
   const t = useTranslations("checkout");
+  const locale = useLocale();
   const money = useMoney();
   const { user } = useAuth();
 
@@ -170,7 +171,10 @@ export default function CheckoutFlow() {
         }
       }
 
-      const response = await api.orders.checkout({ shipping, deliveryMethod });
+      /* The locale travels with the order so Stripe returns the shopper to
+         the language they were shopping in, rather than to a bare URL that has
+         to be redirected and guesses from a cookie. */
+      const response = await api.orders.checkout({ shipping, deliveryMethod, locale });
 
       /* Leaving the site, so `busy` deliberately stays true: the button must
          not spring back to "Pay" while the browser is still navigating, or

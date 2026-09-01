@@ -1,12 +1,20 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { privateMetadata } from "@/lib/seo";
 import CheckoutFlow from "@/components/cart/CheckoutFlow";
 import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("checkout");
-  return { title: t("title"), description: t("metaDescription") };
+export async function generateMetadata(props: PageProps<"/[locale]/checkout">): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "checkout" });
+
+  return privateMetadata({
+    locale,
+    path: "/checkout",
+    title: t("title"),
+    description: t("metaDescription"),
+  });
 }
 
 /* The flow is one client component: the bag, the address and the button that

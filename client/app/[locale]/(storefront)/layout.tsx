@@ -9,5 +9,5 @@ export default async function StorefrontLayout({
   const { locale } = await params;
   setRequestLocale(locale);
 
-  return <StorefrontChrome>{children}</StorefrontChrome>;
+  return <StorefrontChrome locale={locale}>{children}</StorefrontChrome>;
 }

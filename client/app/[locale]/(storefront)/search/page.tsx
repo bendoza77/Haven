@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Link } from "@/i18n/navigation";
 import { getTranslations } from "next-intl/server";
+import { privateMetadata } from "@/lib/seo";
 import { Search, SearchX } from "lucide-react";
 import ProductGrid from "@/components/product/ProductGrid";
 import { ButtonLink } from "@/components/ui/Button";
@@ -9,9 +10,20 @@ import EmptyState from "@/components/ui/EmptyState";
 import SectionHeader from "@/components/ui/SectionHeader";
 import { getCollection, searchProducts } from "@/lib/products";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("search");
-  return { title: t("title"), description: t("metaDescription") };
+export async function generateMetadata(props: PageProps<"/[locale]/search">): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "search" });
+
+  /* Results pages are kept out of the index deliberately. Every distinct query
+     is a URL, each one showing products that already have pages of their own,
+     and a crawler let loose on them spends its budget on thin duplicates of the
+     catalogue instead of on the catalogue. */
+  return privateMetadata({
+    locale,
+    path: "/search",
+    title: t("title"),
+    description: t("metaDescription"),
+  });
 }
 
 /* The chips are translated, but the query they run stays English: the product

@@ -1,12 +1,23 @@
 import type { Metadata } from "next";
 import { Link } from "@/i18n/navigation";
 import { getTranslations } from "next-intl/server";
+import { privateMetadata } from "@/lib/seo";
 import AuthShell, { type Highlight } from "@/components/auth/AuthShell";
 import VerifyEmailClient from "./VerifyEmailClient";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("verifyEmail");
-  return { title: t("metaTitle"), description: t("metaDescription") };
+export async function generateMetadata(
+  props: PageProps<"/[locale]/verify-email/[token]">,
+): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "verifyEmail" });
+
+  /* Token omitted from the canonical for the same reason as the reset link. */
+  return privateMetadata({
+    locale,
+    path: "/verify-email",
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+  });
 }
 
 const HIGHLIGHT_KEYS = ["once", "bag", "nothing"] as const;

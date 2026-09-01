@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 import ProductBrowser from "@/components/product/ProductBrowser";
 import PageHeader from "@/components/ui/PageHeader";
 import { categories, getCategory } from "@/data/catalog";
@@ -11,12 +12,19 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata(props: PageProps<"/[locale]/category/[slug]">) {
-  const { slug } = await props.params;
+  const { locale, slug } = await props.params;
   const category = getCategory(slug);
   if (!category) return {};
 
-  const t = await getTranslations("categories");
-  return { title: t(`${slug}.name`), description: t(`${slug}.description`) };
+  const t = await getTranslations({ locale, namespace: "categories" });
+
+  return pageMetadata({
+    locale,
+    path: `/category/${slug}`,
+    title: t(`${slug}.name`),
+    description: t(`${slug}.description`),
+    images: [category.image],
+  });
 }
 
 export default async function CategoryPage(props: PageProps<"/[locale]/category/[slug]">) {

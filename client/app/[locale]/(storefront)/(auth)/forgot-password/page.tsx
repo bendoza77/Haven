@@ -1,12 +1,22 @@
 import type { Metadata } from "next";
 import { Link } from "@/i18n/navigation";
 import { getTranslations } from "next-intl/server";
+import { privateMetadata } from "@/lib/seo";
 import AuthShell, { type Highlight } from "@/components/auth/AuthShell";
 import ForgotPasswordForm from "@/components/auth/ForgotPasswordForm";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("forgotPassword");
-  return { title: t("metaTitle"), description: t("metaDescription") };
+export async function generateMetadata(
+  props: PageProps<"/[locale]/forgot-password">,
+): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "forgotPassword" });
+
+  return privateMetadata({
+    locale,
+    path: "/forgot-password",
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+  });
 }
 
 /* Keys only; the panel copy is translated alongside the rest of the screen. */

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Link } from "@/i18n/navigation";
-import { getTranslations } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 import { ArrowRight } from "lucide-react";
 import CategoryCard from "@/components/category/CategoryCard";
 import Container from "@/components/ui/Container";
@@ -8,12 +9,24 @@ import PageHeader from "@/components/ui/PageHeader";
 import { categories } from "@/data/catalog";
 import { countByCategory } from "@/lib/products";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("categoriesPage");
-  return { title: t("title"), description: t("metaDescription") };
+export async function generateMetadata(
+  props: PageProps<"/[locale]/categories">,
+): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "categoriesPage" });
+
+  return pageMetadata({
+    locale,
+    path: "/categories",
+    title: t("title"),
+    description: t("metaDescription"),
+  });
 }
 
-export default async function CategoriesPage() {
+export default async function CategoriesPage({ params }: PageProps<"/[locale]/categories">) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+
   const t = await getTranslations("categoriesPage");
   const tBreadcrumb = await getTranslations("breadcrumb");
 

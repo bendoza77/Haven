@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { defaultLocale, locales, type Locale } from "@/i18n/config";
+import { defaultLocale, isLocale, locales, type Locale } from "@/i18n/config";
 import { siteUrl } from "@/lib/site";
 
 /**
@@ -22,17 +22,31 @@ import { siteUrl } from "@/lib/site";
  * `path` is the app's own route — "/shop", "/product/oak-chair" — with no
  * locale on it. This is the only place a prefix is added.
  */
-export function localePath(locale: Locale, path: string) {
-  const clean = path === "/" ? "" : path.replace(/\/+$/, "");
-  return `/${locale}${clean}`;
+/**
+ * `locale` is typed loosely on purpose.
+ *
+ * It arrives from `params`, which Next types as `string` — the route segment is
+ * whatever the URL held. Demanding `Locale` at every call site meant a cast at
+ * every call site, and a cast is exactly the thing that would let a bad segment
+ * through into a published URL. Narrowing once, here, is both shorter and
+ * safer: an unknown value falls back to the default language rather than
+ * appearing verbatim in a canonical tag.
+ */
+function resolve(locale: string): Locale {
+  return isLocale(locale) ? locale : defaultLocale;
 }
 
-export function absoluteUrl(locale: Locale, path: string) {
+export function localePath(locale: string, path: string) {
+  const clean = path === "/" ? "" : path.replace(/\/+$/, "");
+  return `/${resolve(locale)}${clean}`;
+}
+
+export function absoluteUrl(locale: string, path: string) {
   const localised = localePath(locale, path);
   return `${siteUrl}${localised === "/" ? "/" : localised}`;
 }
 
-export function alternates(locale: Locale, path: string): Metadata["alternates"] {
+export function alternates(locale: string, path: string): Metadata["alternates"] {
   const languages: Record<string, string> = {};
 
   for (const candidate of locales) {
@@ -62,7 +76,7 @@ export function pageMetadata({
   images,
   type = "website",
 }: {
-  locale: Locale;
+  locale: string;
   path: string;
   title: string;
   description: string;
@@ -80,7 +94,7 @@ export function pageMetadata({
       url,
       title,
       description,
-      locale,
+      locale: resolve(locale),
       ...(images?.length ? { images } : {}),
     },
     twitter: {
@@ -103,3 +117,38 @@ export function pageMetadata({
 export const noIndex: Metadata = {
   robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
 };
+
+/**
+ * Metadata for one of those pages.
+ *
+ * The canonical is the load-bearing half and the reason this is a helper rather
+ * than a spread of `noIndex` at each call site. `alternates` is set in the root
+ * layout, and metadata is inherited: a page that does not state its own address
+ * keeps its parent's, so every screen in the shop was shipping
+ * `<link rel="canonical" href=".../en">` — the sign-in form, the bag, each
+ * product page, all of them declaring themselves to be a copy of the home page.
+ * A crawler that believes that indexes one URL and drops the rest, which is the
+ * single most expensive thing this codebase was doing to itself.
+ *
+ * No `languages` block here. Telling a crawler about the translations of a page
+ * it has been asked not to index is noise, and hreflang sets are only honoured
+ * when every URL in them is indexable.
+ */
+export function privateMetadata({
+  locale,
+  path,
+  title,
+  description,
+}: {
+  locale: string;
+  path: string;
+  title: string;
+  description?: string;
+}): Metadata {
+  return {
+    title,
+    ...(description ? { description } : {}),
+    alternates: { canonical: absoluteUrl(locale, path) },
+    ...noIndex,
+  };
+}

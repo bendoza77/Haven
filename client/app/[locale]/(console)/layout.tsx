@@ -1,9 +1,26 @@
+import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
+import { noIndex } from "@/lib/seo";
 import { ConsoleAuthProvider } from "@/context/ConsoleAuthContext";
 import { ReviewProvider } from "@/context/ReviewContext";
 import { UserProvider } from "@/context/UserContext";
 import { CONSOLE_CLIENT, clientMessages } from "@/i18n/messages";
+
+/**
+ * No console page belongs in a search result, and one directive here covers
+ * all of them: metadata is inherited, and none of the pages below sets
+ * `robots` of its own.
+ *
+ * The `alternates` the root layout sets are dropped too. Left in place, every
+ * console screen was publishing `<link rel="canonical" href=".../en">` and an
+ * hreflang set for the shop's home page — a staff tool asserting that it is
+ * the storefront.
+ */
+export const metadata: Metadata = {
+  ...noIndex,
+  alternates: {},
+};
 
 /**
  * Everything staff-facing sits under one session.
@@ -24,7 +41,7 @@ export default async function ConsoleGroupLayout({ children, params }: LayoutPro
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const messages = await clientMessages(CONSOLE_CLIENT);
+  const messages = await clientMessages(locale, CONSOLE_CLIENT);
 
   return (
     <NextIntlClientProvider messages={messages}>

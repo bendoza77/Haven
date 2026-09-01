@@ -1,6 +1,8 @@
 import { Link } from "@/i18n/navigation";
 import { notFound } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { absoluteUrl, pageMetadata } from "@/lib/seo";
+import { siteUrl } from "@/lib/site";
 import { RotateCcw, ShieldCheck, Truck } from "lucide-react";
 import ProductGallery from "@/components/product/ProductGallery";
 import ProductGrid from "@/components/product/ProductGrid";
@@ -14,7 +16,13 @@ import Price from "@/components/ui/Price";
 import Rating from "@/components/ui/Rating";
 import SectionHeader from "@/components/ui/SectionHeader";
 import { getCategory } from "@/data/catalog";
-import { getProduct, getRelatedProducts } from "@/lib/products";
+import type { Product } from "@/lib/api";
+import {
+  fetchLiveProducts,
+  fetchReviews,
+  getProduct,
+  getRelatedProducts,
+} from "@/lib/products";
 
 const badgeTones = { New: "new", Sale: "sale", Bestseller: "bestseller" } as const;
 
@@ -25,19 +33,45 @@ const assurances = [
   { icon: ShieldCheck, key: "guarantee" },
 ] as const;
 
-/* No generateStaticParams: the catalogue is a database the consoles write to,
-   so the set of product pages is not known at build time. */
+/**
+ * Every product that existed at build time, in both languages.
+ *
+ * The catalogue is a database the consoles write to, so this list is a
+ * snapshot rather than the whole truth — which is exactly what
+ * `dynamicParams` (on by default) is for: a product added after the build
+ * renders on its first request and is cached from then on. What the snapshot
+ * buys is that the pages a crawler and a shopper actually reach are already
+ * built, served from the edge, and revalidated by the tag the consoles purge
+ * — instead of every product page being rendered on demand, every time, which
+ * is what the route was doing.
+ *
+ * An unreachable API yields an empty list and every page falls back to being
+ * built on request. That is the old behaviour, so a build never fails over it.
+ */
+export async function generateStaticParams() {
+  const products = await fetchLiveProducts();
+  return products.map((product) => ({ slug: product.slug }));
+}
 
 export async function generateMetadata(props: PageProps<"/[locale]/product/[slug]">) {
-  const { slug } = await props.params;
+  const { locale, slug } = await props.params;
   const product = await getProduct(slug);
   if (!product) return {};
 
-  return { title: product.name, description: product.description };
+  return pageMetadata({
+    locale,
+    path: `/product/${slug}`,
+    title: product.name,
+    description: product.description,
+    images: product.image ? [product.image] : undefined,
+    type: "article",
+  });
 }
 
 export default async function ProductPage(props: PageProps<"/[locale]/product/[slug]">) {
-  const { slug } = await props.params;
+  const { locale, slug } = await props.params;
+  setRequestLocale(locale);
+
   const product = await getProduct(slug);
 
   if (!product) notFound();
@@ -47,7 +81,13 @@ export default async function ProductPage(props: PageProps<"/[locale]/product/[s
   const tBreadcrumb = await getTranslations("breadcrumb");
 
   const category = getCategory(product.category);
-  const related = await getRelatedProducts(product);
+
+  /* Both read from the same cached catalogue, so asking for them together
+     costs one round trip rather than two in series. */
+  const [related, reviews] = await Promise.all([
+    getRelatedProducts(product),
+    fetchReviews(slug),
+  ]);
   const categoryName = category ? tCat(`${category.slug}.name`) : undefined;
 
   return (
@@ -141,7 +181,11 @@ export default async function ProductPage(props: PageProps<"/[locale]/product/[s
 
       <section id="reviews" className="border-t border-line py-16 lg:py-24">
         <Container>
-          <ProductReviews slug={product.slug} productName={product.name} />
+          <ProductReviews
+            slug={product.slug}
+            productName={product.name}
+            initialReviews={reviews}
+          />
         </Container>
       </section>
 
@@ -165,6 +209,79 @@ export default async function ProductPage(props: PageProps<"/[locale]/product/[s
           </Container>
         </section>
       )}
+
+      <ProductStructuredData locale={locale} product={product} reviewCount={reviews.length} />
     </>
+  );
+}
+
+/**
+ * The piece, described in the vocabulary a search engine reads.
+ *
+ * This is the markup behind a price, an availability line and a star rating
+ * appearing under a result rather than a bare blue link, and a shop that omits
+ * it is competing for its own products against listings that do not. The site
+ * already published an Organization and a WebSite graph; the thing actually
+ * being sold had none.
+ *
+ * Every claim below is read off the record being rendered. That is the whole
+ * discipline of structured data: `aggregateRating` is emitted only when there
+ * are reviews to average, and `availability` follows the stock figure the page
+ * itself is showing. Asserting a rating no page displays, or "in stock" for
+ * something that is not, is what earns a manual penalty — and the penalty
+ * removes the rich result for the whole site, not for the one product.
+ */
+function ProductStructuredData({
+  locale,
+  product,
+  reviewCount,
+}: {
+  locale: string;
+  product: Product;
+  reviewCount: number;
+}) {
+  const url = absoluteUrl(locale, `/product/${product.slug}`);
+  const images = [product.image, ...(product.images ?? [])].filter(Boolean);
+
+  const graph: Record<string, unknown> = {
+    "@type": "Product",
+    "@id": `${url}#product`,
+    name: product.name,
+    description: product.description,
+    image: images.length ? images : undefined,
+    sku: product._id,
+    category: product.category,
+    offers: {
+      "@type": "Offer",
+      url,
+      priceCurrency: "USD",
+      price: product.price.toFixed(2),
+      availability:
+        product.stock > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+      itemCondition: "https://schema.org/NewCondition",
+      seller: { "@id": `${siteUrl}/#organization` },
+    },
+  };
+
+  /* Only when the page is showing one. */
+  if (reviewCount > 0 && product.rating > 0) {
+    graph.aggregateRating = {
+      "@type": "AggregateRating",
+      ratingValue: product.rating.toFixed(1),
+      reviewCount,
+      bestRating: 5,
+      worstRating: 1,
+    };
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify({ "@context": "https://schema.org", ...graph }),
+      }}
+    />
   );
 }

@@ -92,9 +92,37 @@ refusing the connection — see step 5.
 | `NEXT_PUBLIC_API_URL` | `/api` |
 | `API_ORIGIN` | `https://haven-api.vercel.app` — the API project's URL, **no trailing slash** |
 | `INTERNAL_PROXY_SECRET` | the **same** value you set on `haven-api` |
+| `NEXT_PUBLIC_SITE_URL` | the storefront's own address, **no trailing slash**. Only needed once a custom domain exists — without it the shop uses the project's production `.vercel.app` domain, which is correct, just not the address you want indexed. |
 
 `API_ORIGIN` is read while the build runs, so changing it later means
 redeploying, not just restarting.
+
+### These two are a pair, and getting them wrong is silent
+
+`NEXT_PUBLIC_API_URL=/api` with `API_ORIGIN` **unset** is the failure mode to
+watch for, because nothing errors. With no `API_ORIGIN` the rewrite in
+`next.config.ts` is never created, so `/api/*` on the storefront matches no
+route and answers with the shop's own 404 page.
+
+Pointing `NEXT_PUBLIC_API_URL` straight at the API instead —
+`https://haven-api.vercel.app/api` — makes the shop work well enough to look
+fine and costs three things at once:
+
+* **The session becomes a third-party cookie.** Safari blocks those outright
+  and Chrome is removing them, so signing in fails for a real share of visitors
+  with no error worth reading.
+* **Every call pays a CORS preflight.** An extra round trip before each
+  authenticated request, on top of the request itself.
+* **Nothing goes through `proxy.ts`.** The visitor's address is never forwarded,
+  so the API rate-limits by the address it sees, which is the storefront's.
+
+Check it after any deploy — this should return the API's health JSON, not HTML:
+
+```
+curl -s https://<your-storefront>/api/health
+```
+
+If it returns a page, `API_ORIGIN` is missing.
 
 The `NEXT_PUBLIC_FIREBASE_*` variables are not needed. Staff sign in against the
 Express API with their Haven account; the Firebase helper is left over and

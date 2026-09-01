@@ -1,18 +1,23 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { privateMetadata } from "@/lib/seo";
 import { CreditCard, RotateCcw } from "lucide-react";
 import Container from "@/components/ui/Container";
 import { ButtonLink } from "@/components/ui/Button";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("checkoutFailed");
+export async function generateMetadata(
+  props: PageProps<"/[locale]/checkout/failed">,
+): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "checkoutFailed" });
 
-  return {
+  /* Nothing here belongs in a search result. */
+  return privateMetadata({
+    locale,
+    path: "/checkout/failed",
     title: t("title"),
     description: t("intro"),
-    /* Nothing here belongs in a search result. */
-    robots: { index: false, follow: false },
-  };
+  });
 }
 
 /**

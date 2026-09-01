@@ -1,13 +1,25 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 import ProductBrowser from "@/components/product/ProductBrowser";
 import PageHeader from "@/components/ui/PageHeader";
 import { fetchLiveProducts } from "@/lib/products";
 import { isSortValue } from "@/lib/shop";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("shop");
-  return { title: t("metaTitle"), description: t("metaDescription") };
+export async function generateMetadata(props: PageProps<"/[locale]/shop">): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "shop" });
+
+  /* The bare /shop is the canonical one. A sorted, filtered or paginated view
+     of the same grid is the same page seen through a query string, and letting
+     each of those claim its own address is how a catalogue ends up competing
+     with itself for its own terms. */
+  return pageMetadata({
+    locale,
+    path: "/shop",
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+  });
 }
 
 export default async function ShopPage(props: PageProps<"/[locale]/shop">) {

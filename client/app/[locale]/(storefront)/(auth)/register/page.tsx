@@ -1,12 +1,20 @@
 import type { Metadata } from "next";
 import { Link } from "@/i18n/navigation";
 import { getTranslations } from "next-intl/server";
+import { privateMetadata } from "@/lib/seo";
 import AuthShell, { type Highlight } from "@/components/auth/AuthShell";
 import RegisterForm from "@/components/auth/RegisterForm";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("register");
-  return { title: t("metaTitle"), description: t("metaDescription") };
+export async function generateMetadata(props: PageProps<"/[locale]/register">): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "register" });
+
+  return privateMetadata({
+    locale,
+    path: "/register",
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+  });
 }
 
 /* Keys only; the panel copy is translated alongside the rest of the screen. */

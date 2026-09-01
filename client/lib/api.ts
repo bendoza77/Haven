@@ -462,6 +462,18 @@ export const api = {
     checkout(payload: {
       shipping: Omit<Address, "_id" | "label" | "isDefault">;
       deliveryMethod?: Order["deliveryMethod"];
+      /**
+       * The language to return the shopper to.
+       *
+       * Stripe hosts the payment page and sends the browser back to a URL this
+       * request decides. Without a locale on it the shopper came back to an
+       * unprefixed address — which only ever worked because the middleware
+       * redirected it, and only in whichever language the cookie happened to
+       * hold. Sending it explicitly means a Georgian shopper returns to
+       * Georgian, in one hop, with nothing riding on a cookie surviving a trip
+       * through a third-party checkout.
+       */
+      locale?: string;
     }) {
       return request<ApiResponse<{ order: Order; sessionId: string; sessionUrl: string }>>(
         "/orders/checkout",

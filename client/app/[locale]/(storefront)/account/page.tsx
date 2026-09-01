@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { privateMetadata } from "@/lib/seo";
 import AccountClient from "@/components/account/AccountClient";
 import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("account");
-  const tBreadcrumb = await getTranslations("breadcrumb");
-  return { title: tBreadcrumb("account"), description: t("metaDescription") };
+export async function generateMetadata(props: PageProps<"/[locale]/account">): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "account" });
+  const tBreadcrumb = await getTranslations({ locale, namespace: "breadcrumb" });
+
+  return privateMetadata({
+    locale,
+    path: "/account",
+    title: tBreadcrumb("account"),
+    description: t("metaDescription"),
+  });
 }
 
 const tabs = ["profile", "orders", "addresses", "settings"] as const;

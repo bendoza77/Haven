@@ -1,14 +1,22 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { privateMetadata } from "@/lib/seo";
 import CartClient from "@/components/cart/CartClient";
 import AccountCount from "@/components/layout/AccountCount";
 import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("cart");
-  const tBreadcrumb = await getTranslations("breadcrumb");
-  return { title: tBreadcrumb("cart"), description: t("metaDescription") };
+export async function generateMetadata(props: PageProps<"/[locale]/cart">): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "cart" });
+  const tBreadcrumb = await getTranslations({ locale, namespace: "breadcrumb" });
+
+  return privateMetadata({
+    locale,
+    path: "/cart",
+    title: tBreadcrumb("cart"),
+    description: t("metaDescription"),
+  });
 }
 
 export default async function CartPage() {

@@ -19,14 +19,17 @@ import { STOREFRONT_CLIENT, clientMessages } from "@/i18n/messages";
  * on that page alone.
  */
 export default async function StorefrontChrome({
+  locale,
   children,
   extra = [],
 }: {
+  /** Omitted only by the not-found boundary, which has no segment to read. */
+  locale?: string;
   children: React.ReactNode;
   /** Extra namespace groups this page's client components need. */
   extra?: readonly (readonly string[])[];
 }) {
-  const messages = await clientMessages(STOREFRONT_CLIENT, ...extra);
+  const messages = await clientMessages(locale, STOREFRONT_CLIENT, ...extra);
 
   return (
     <NextIntlClientProvider messages={messages}>

@@ -31,6 +31,36 @@ const stripe = () => {
 const clientUrl = () =>
     (process.env.CLIENT_URL ?? "").split(",")[0].trim().replace(/\/+$/, "");
 
+/**
+ * The languages the storefront serves, and the one to assume.
+ *
+ * Kept as a list rather than trusting whatever the request sends, because
+ * these values are concatenated into a URL Stripe will send a browser to: an
+ * unchecked string here is an open redirect wearing the shop's own domain.
+ */
+const LOCALES = (process.env.CLIENT_LOCALES ?? "en,ka")
+    .split(",")
+    .map((code) => code.trim())
+    .filter(Boolean);
+
+const DEFAULT_LOCALE = LOCALES[0] ?? "en";
+
+/**
+ * Where to send the shopper back to, in their own language.
+ *
+ * Every storefront route is prefixed — /en/account, /ka/checkout/failed — so a
+ * return URL without a prefix matches no route. It used to be redirected into
+ * one by the storefront's middleware, which meant a shopper who had paid was
+ * sent to a bare /account and depended on a redirect and a cookie to land
+ * anywhere sensible; when that middleware was not running, they landed on a
+ * 404 holding a receipt. Naming the locale removes both the extra hop and the
+ * guess.
+ */
+const returnUrl = (locale, path) => {
+    const language = LOCALES.includes(locale) ? locale : DEFAULT_LOCALE;
+    return `${clientUrl()}/${language}${path}`;
+};
+
 /* Delivery, as the checkout screen offers it. Prices are policy and live here
    rather than on the client, so a shopper cannot choose their own. */
 const DELIVERY = {
@@ -89,7 +119,7 @@ const createCheckoutSession = catchAsync(async (req, res, next) => {
         return next(new AppError("Card payments are not configured on this store", 503));
     }
 
-    const { shipping, deliveryMethod = "standard" } = req.body ?? {};
+    const { shipping, deliveryMethod = "standard", locale } = req.body ?? {};
 
     if (!DELIVERY[deliveryMethod]) {
         return next(new AppError("That is not a delivery option", 400));
@@ -220,8 +250,11 @@ const createCheckoutSession = catchAsync(async (req, res, next) => {
             /* Stripe substitutes the id on the way back, which is what lets the
                account page confirm a particular payment rather than assume one
                happened because somebody landed on a URL. */
-            success_url: `${clientUrl()}/account?tab=orders&order=${order.reference}&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${clientUrl()}/checkout/failed?order=${order.reference}`,
+            success_url: returnUrl(
+                locale,
+                `/account?tab=orders&order=${order.reference}&session_id={CHECKOUT_SESSION_ID}`
+            ),
+            cancel_url: returnUrl(locale, `/checkout/failed?order=${order.reference}`),
 
             /* An unpaid session should not hold a reference open forever. */
             expires_at: Math.floor(Date.now() / 1000) + 30 * 60

@@ -17,12 +17,28 @@
  * the shop.
  *
  * NEXT_PUBLIC_ because the client bundle links to it too. It is a public
- * address, not a secret. On Vercel the preview URL is used when nothing is
- * configured, which keeps previews self-consistent; localhost is the last
- * resort so a developer never sees a production hostname in dev markup.
+ * address, not a secret.
+ *
+ * The order of the fallbacks matters more than it looks. VERCEL_URL is the
+ * *deployment's* own hostname — haven-f2a6w6dct-…vercel.app — a new one on
+ * every push and an address no visitor ever types. Reaching for it first meant
+ * production shipped canonicals and Open Graph URLs pointing at a hostname
+ * that would be superseded within the day, so every page a crawler indexed
+ * named an address that no longer identified the site.
+ * VERCEL_PROJECT_PRODUCTION_URL is the stable one — the project's production
+ * domain, the same on every deployment — which is what those tags have to say.
+ * VERCEL_URL is kept behind it so a preview branch still describes itself
+ * rather than claiming to be production, and localhost is the last resort so a
+ * developer never sees a production hostname in dev markup.
+ *
+ * Set NEXT_PUBLIC_SITE_URL once a custom domain exists: it is the only one of
+ * these that knows about a domain Vercel did not issue.
  */
 export const siteUrl = (
   process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL}`
+    : undefined) ??
   (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : undefined) ??
   "http://localhost:3000"
 ).replace(/\/+$/, "");

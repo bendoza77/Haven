@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useTransition } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Check, Globe } from "lucide-react";
@@ -25,9 +25,10 @@ import { cn } from "@/lib/utils";
  * the wire. `useTransition` keeps the current text on screen and interactive
  * while that happens rather than blanking the page.
  *
- * The `lang` attribute is still set by hand and immediately: it drives the
- * Georgian font stack and the `:lang(ka)` type rules, and waiting for the new
- * document to commit would show one paint of Georgian in Latin metrics.
+ * What was still cold is the payload itself: a button has no href, so Next had
+ * nothing to prefetch and every switch began with a round trip. The effect
+ * below warms the sibling route while the page is idle, which is what makes
+ * the change land in a frame or two rather than after a visible pause.
  */
 function useLocaleSwitch() {
   const router = useRouter();
@@ -36,22 +37,66 @@ function useLocaleSwitch() {
   const active = useLocale() as Locale;
   const [pending, startTransition] = useTransition();
 
-  const switchTo = (next: Locale) => {
-    if (next === active) return;
-
-    applyDocumentLocale(next);
-
-    /* `pathname` here has no locale on it — it is the route as the app names
-       it — so the same address is simply re-asked for in the other language.
-       The query string is carried across by hand: a shopper switching language
-       half way down a filtered, sorted, paginated shop expects to still be
-       looking at it. */
+  /* `pathname` here has no locale on it — it is the route as the app names it
+     — so the same address is simply re-asked for in the other language. The
+     query string is carried across by hand: a shopper switching language half
+     way down a filtered, sorted, paginated shop expects to still be looking at
+     it. */
+  const href = useMemo(() => {
     const query = searchParams.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
 
-    startTransition(() => {
-      router.replace(query ? `${pathname}?${query}` : pathname, { locale: next });
-    });
-  };
+  const others = useMemo(() => locales.filter((locale) => locale !== active), [active]);
+
+  /**
+   * Warms the other language before it is asked for.
+   *
+   * Next prefetches the links it can see, but the language control is a button
+   * — there is no href for the router to notice — so the switch was the one
+   * navigation on the page that always started cold: a round trip for the
+   * route's payload while the reader watched the old language sit there. The
+   * other locale's copy of the current route is small and already rendered
+   * upstream, so fetching it up front makes the switch land in a frame or two.
+   *
+   * In an idle callback because it is speculative work: it must not compete
+   * with hydration or with anything the reader actually asked for.
+   */
+  useEffect(() => {
+    /* `requestIdleCallback` is still unimplemented in Safari, so a short timer
+       stands in for it there — the point is only to be after hydration, not to
+       be precise. */
+    const supported = typeof window.requestIdleCallback === "function";
+
+    const handle = supported
+      ? window.requestIdleCallback(() => {
+          for (const locale of others) router.prefetch(href, { locale });
+        })
+      : window.setTimeout(() => {
+          for (const locale of others) router.prefetch(href, { locale });
+        }, 300);
+
+    return () => {
+      if (supported) window.cancelIdleCallback(handle);
+      else window.clearTimeout(handle);
+    };
+  }, [href, others, router]);
+
+  const switchTo = useCallback(
+    (next: Locale) => {
+      if (next === active) return;
+
+      /* Set by hand and immediately: `lang` drives the Georgian font stack and
+         the `:lang(ka)` type rules, and waiting for the new document to commit
+         would show one paint of Georgian in Latin metrics. */
+      applyDocumentLocale(next);
+
+      startTransition(() => {
+        router.replace(href, { locale: next });
+      });
+    },
+    [active, href, router],
+  );
 
   return { active, pending, switchTo };
 }
